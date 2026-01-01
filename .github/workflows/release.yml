@@ -7,6 +7,9 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: write
+  
 jobs:
   # Job to determine if we should create a release
   check-release:
@@ -122,14 +125,44 @@ jobs:
       - name: Display structure of downloaded files
         run: ls -la artifacts/*/
 
+      - name: Prepare release files
+        run: |
+          mkdir -p release-files
+          
+          # Copy and rename Windows files
+          if [ -f "artifacts/windows-build/WoW 3.3.5a Launcher Setup ${{ needs.check-release.outputs.version }}.exe" ]; then
+            cp "artifacts/windows-build/WoW 3.3.5a Launcher Setup ${{ needs.check-release.outputs.version }}.exe" "release-files/WoW-Launcher-Setup-v${{ needs.check-release.outputs.version }}.exe"
+          fi
+          if [ -f "artifacts/windows-build/WoW 3.3.5a Launcher ${{ needs.check-release.outputs.version }}.exe" ]; then
+            cp "artifacts/windows-build/WoW 3.3.5a Launcher ${{ needs.check-release.outputs.version }}.exe" "release-files/WoW-Launcher-Portable-v${{ needs.check-release.outputs.version }}.exe"
+          fi
+          
+          # Copy and rename macOS files
+          if [ -f "artifacts/macos-build/WoW 3.3.5a Launcher-${{ needs.check-release.outputs.version }}.dmg" ]; then
+            cp "artifacts/macos-build/WoW 3.3.5a Launcher-${{ needs.check-release.outputs.version }}.dmg" "release-files/WoW-Launcher-Intel-v${{ needs.check-release.outputs.version }}.dmg"
+          fi
+          if [ -f "artifacts/macos-build/WoW 3.3.5a Launcher-${{ needs.check-release.outputs.version }}-arm64.dmg" ]; then
+            cp "artifacts/macos-build/WoW 3.3.5a Launcher-${{ needs.check-release.outputs.version }}-arm64.dmg" "release-files/WoW-Launcher-AppleSilicon-v${{ needs.check-release.outputs.version }}.dmg"
+          fi
+          
+          # Copy and rename Linux files
+          if [ -f "artifacts/linux-build/WoW 3.3.5a Launcher-${{ needs.check-release.outputs.version }}.AppImage" ]; then
+            cp "artifacts/linux-build/WoW 3.3.5a Launcher-${{ needs.check-release.outputs.version }}.AppImage" "release-files/WoW-Launcher-v${{ needs.check-release.outputs.version }}.AppImage"
+          fi
+          if [ -f "artifacts/linux-build/wow-launcher_${{ needs.check-release.outputs.version }}_amd64.deb" ]; then
+            cp "artifacts/linux-build/wow-launcher_${{ needs.check-release.outputs.version }}_amd64.deb" "release-files/WoW-Launcher-v${{ needs.check-release.outputs.version }}.deb"
+          fi
+          if [ -f "artifacts/linux-build/wow-launcher-${{ needs.check-release.outputs.version }}.tar.gz" ]; then
+            cp "artifacts/linux-build/wow-launcher-${{ needs.check-release.outputs.version }}.tar.gz" "release-files/WoW-Launcher-v${{ needs.check-release.outputs.version }}.tar.gz"
+          fi
+          
+          ls -la release-files/
+
       - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.check-release.outputs.version }}
-          release_name: WoW Launcher v${{ needs.check-release.outputs.version }}
+          name: WoW Launcher v${{ needs.check-release.outputs.version }}
           body: |
             ## WoW 3.3.5a Launcher Release v${{ needs.check-release.outputs.version }}
 
@@ -163,87 +196,5 @@ jobs:
             Built with ❤️ using Electron and Node.js
           draft: false
           prerelease: false
-
-      - name: Upload Windows Setup
-        if: always()
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: artifacts/windows-build/WoW 3.3.5a Launcher Setup ${{ needs.check-release.outputs.version }}.exe
-          asset_name: WoW-Launcher-Setup-v${{ needs.check-release.outputs.version }}.exe
-          asset_content_type: application/x-msdownload
-        continue-on-error: true
-
-      - name: Upload Windows Portable
-        if: always()
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: artifacts/windows-build/WoW 3.3.5a Launcher ${{ needs.check-release.outputs.version }}.exe
-          asset_name: WoW-Launcher-Portable-v${{ needs.check-release.outputs.version }}.exe
-          asset_content_type: application/x-msdownload
-        continue-on-error: true
-
-      - name: Upload macOS DMG (Intel)
-        if: always()
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: artifacts/macos-build/WoW 3.3.5a Launcher-${{ needs.check-release.outputs.version }}.dmg
-          asset_name: WoW-Launcher-Intel-v${{ needs.check-release.outputs.version }}.dmg
-          asset_content_type: application/x-apple-diskimage
-        continue-on-error: true
-
-      - name: Upload macOS DMG (Apple Silicon)
-        if: always()
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: artifacts/macos-build/WoW 3.3.5a Launcher-${{ needs.check-release.outputs.version }}-arm64.dmg
-          asset_name: WoW-Launcher-AppleSilicon-v${{ needs.check-release.outputs.version }}.dmg
-          asset_content_type: application/x-apple-diskimage
-        continue-on-error: true
-
-      - name: Upload Linux AppImage
-        if: always()
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: artifacts/linux-build/WoW 3.3.5a Launcher-${{ needs.check-release.outputs.version }}.AppImage
-          asset_name: WoW-Launcher-v${{ needs.check-release.outputs.version }}.AppImage
-          asset_content_type: application/x-executable
-        continue-on-error: true
-
-      - name: Upload Linux DEB
-        if: always()
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: artifacts/linux-build/wow-launcher_${{ needs.check-release.outputs.version }}_amd64.deb
-          asset_name: WoW-Launcher-v${{ needs.check-release.outputs.version }}.deb
-          asset_content_type: application/vnd.debian.binary-package
-        continue-on-error: true
-
-      - name: Upload Linux TAR.GZ
-        if: always()
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: artifacts/linux-build/wow-launcher-${{ needs.check-release.outputs.version }}.tar.gz
-          asset_name: WoW-Launcher-v${{ needs.check-release.outputs.version }}.tar.gz
-          asset_content_type: application/gzip
-        continue-on-error: true
+          files: release-files/*
+          fail_on_unmatched_files: false
