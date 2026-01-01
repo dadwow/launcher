@@ -513,7 +513,7 @@ async function checkWineInstallation() {
             elements.wineStatus.className = 'status-display error';
             elements.wineStatus.innerHTML = `
                 <span class="status-icon">❌</span>
-                <span>Wine not found - Required to run WoW on ${optionsState.platform.platformName}</span>
+                <span>Wine not found - Will be installed automatically when needed</span>
             `;
             elements.wineInstallInstructions.style.display = 'block';
             elements.winePrefixConfig.style.display = 'none';
@@ -528,16 +528,26 @@ async function showWineInstallInstructions() {
         const instructions = await window.electronAPI.getWineInstallInstructions();
         if (!instructions) return;
 
-        let instructionText = `${instructions.title}\n\n`;
+        let instructionText = `AUTOMATIC WINE INSTALLATION\n`;
+        instructionText += `The launcher will automatically install Wine when you try to launch or download the game.\n`;
+        instructionText += `This is the recommended approach for most users.\n\n`;
+        
+        if (instructions.note) {
+            instructionText += `${instructions.note}\n\n`;
+        }
+        
+        instructionText += `${instructions.title}\n\n`;
 
         instructions.methods.forEach((method, index) => {
             instructionText += `${index + 1}. ${method.name}\n`;
-            instructionText += `${method.description}\n`;
+            if (method.description) instructionText += `${method.description}\n`;
             if (method.url) instructionText += `URL: ${method.url}\n`;
-            instructionText += 'Steps:\n';
-            method.steps.forEach((step, stepIndex) => {
-                instructionText += `  ${stepIndex + 1}. ${step}\n`;
-            });
+            if (method.steps) {
+                instructionText += 'Steps:\n';
+                method.steps.forEach((step, stepIndex) => {
+                    instructionText += `  ${stepIndex + 1}. ${step}\n`;
+                });
+            }
             instructionText += '\n';
         });
 

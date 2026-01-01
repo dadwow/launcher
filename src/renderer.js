@@ -44,9 +44,15 @@ async function initializeApp() {
         showLoading('Loading configuration...');
 
         // Get configuration and platform info from main process
+        console.log('Loading configuration...');
         appState.config = await window.electronAPI.getConfig();
+        console.log('Config loaded:', appState.config);
+        
         appState.platform = appState.config.platform;
+        console.log('Platform info:', appState.platform);
+        
         appState.settings = await window.electronAPI.loadSettings();
+        console.log('Settings loaded:', appState.settings);
 
         // Update UI with configuration
         elements.serverName.textContent = appState.config.serverName;
@@ -54,32 +60,45 @@ async function initializeApp() {
         // Use settings or fallback to config
         appState.installPath = appState.settings.installPath || appState.config.installPath || '';
         appState.realmAddress = appState.settings.realmAddress || appState.config.defaultRealm || '';
+        console.log('Install path:', appState.installPath);
 
         // Check Wine installation on non-Windows platforms
         if (appState.platform.needsWine) {
             showLoading('Checking Wine installation...');
+            console.log('Checking Wine installation...');
             appState.wineInfo = await window.electronAPI.checkWineInstallation();
+            console.log('Wine info:', appState.wineInfo);
         }
 
         // Check initial installation status
+        console.log('Checking game status...');
         await checkGameStatus();
 
         // Set up event listeners
+        console.log('Setting up event listeners...');
         setupEventListeners();
-
-        // Check if download URL is configured
-        if (!appState.config.downloadUrl && !appState.settings.downloadUrl) {
-            elements.downloadSection.style.display = 'none';
-        }
 
         hideLoading();
         updateServerStatus('online'); // You can implement actual server status checking later
+        console.log('Launcher initialized successfully!');
 
     } catch (error) {
         console.error('Failed to initialize app:', error);
+        console.error('Error stack:', error.stack);
         hideLoading();
         showError('Failed to initialize launcher. Please restart the application.');
     }
+}
+
+// Handle Wine installation progress updates
+function handleWineInstallProgress(event, data) {
+    const { message, progress } = data;
+    
+    elements.progressText.textContent = message;
+    elements.progressFill.style.width = `${progress}%`;
+    elements.progressPercentage.textContent = `${progress}%`;
+    
+    console.log(`Wine installation progress: ${progress}% - ${message}`);
 }
 
 // Set up all event listeners
@@ -104,6 +123,9 @@ function setupEventListeners() {
     window.electronAPI.onDownloadProgress(handleDownloadProgress);
     window.electronAPI.onDownloadComplete(handleDownloadComplete);
     window.electronAPI.onDownloadError(handleDownloadError);
+    
+    // Wine installation progress listener
+    window.electronAPI.onWineInstallProgress(handleWineInstallProgress);
 
     // Listen for settings changes from options window
     window.addEventListener('focus', async () => {
@@ -144,7 +166,9 @@ async function checkGameStatus() {
     }
     
     try {
-        const installationCheck = await window.electronAPI.checkWowInstallation(appState.installPath);        if (installationCheck.isValid) {
+        const installationCheck = await window.electronAPI.checkWowInstallation(appState.installPath);
+        
+        if (installationCheck.isValid) {
             appState.isWowInstalled = true;
             let statusMessage = `WoW client ready! (${installationCheck.platform})`;
             if (installationCheck.wineInfo?.version) {
@@ -169,7 +193,7 @@ async function checkGameStatus() {
             }
 
             updateGameStatus('error', message);
-
+            
             // Check if we can download
             const canDownload = appState.config.downloadUrl || appState.settings.downloadUrl;
             if (canDownload) {
@@ -182,6 +206,51 @@ async function checkGameStatus() {
         console.error('Error checking installation:', error);
         updateGameStatus('error', 'Error checking installation directory.');
         updateMainActionButton('configure', 'Check Configuration', false);
+    }
+}
+
+// Automatic Wine installation
+async function installWineAutomatically() {
+    try {
+        updateMainActionButton('configure', 'Installing Wine...', false);
+        updateGameStatus('warning', 'Installing Wine automatically...');
+        
+        // Show progress container for Wine installation
+        elements.progressContainer.style.display = 'block';
+        elements.progressText.textContent = 'Preparing Wine installation...';
+        elements.progressFill.style.width = '0%';
+        elements.progressPercentage.textContent = '0%';
+
+        const result = await window.electronAPI.installWineAutomatically();
+        
+        if (result.success) {
+            updateGameStatus('success', result.message);
+            
+            // Recheck Wine installation
+            appState.wineInfo = await window.electronAPI.checkWineInstallation();
+            
+            // Hide progress and recheck game status
+            elements.progressContainer.style.display = 'none';
+            
+            if (result.requiresRestart) {
+                updateMainActionButton('configure', 'Restart Required', false);
+                showInfo('Wine installation completed! Please restart your Mac and then relaunch this application.');
+            } else {
+                await checkGameStatus();
+            }
+        } else {
+            updateGameStatus('error', `Wine installation failed: ${result.message}`);
+            updateMainActionButton('configure', 'Install Wine (Retry)', true);
+            elements.progressContainer.style.display = 'none';
+            showError(`Automatic Wine installation failed: ${result.message}\n\nYou can try the manual installation method in Options.`);
+        }
+        
+    } catch (error) {
+        console.error('Wine installation error:', error);
+        updateGameStatus('error', 'Wine installation failed');
+        updateMainActionButton('configure', 'Install Wine (Retry)', true);
+        elements.progressContainer.style.display = 'none';
+        showError('Wine installation failed. Please check your internet connection and try again.');
     }
 }
 

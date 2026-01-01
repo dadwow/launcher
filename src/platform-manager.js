@@ -15,6 +15,7 @@ class PlatformManager {
         this.isMacOS = this.platform === 'darwin';
         this.isLinux = this.platform === 'linux';
         this.needsWine = !this.isWindows;
+        this._wineInstalling = false;
     }
 
     // Get platform-specific information
@@ -330,24 +331,31 @@ class PlatformManager {
             return { success: true, message: 'Wine not needed on Windows' };
         }
 
+        this._wineInstalling = true;
+        
         if (progressCallback) progressCallback('Starting Wine installation...', 0);
 
         try {
+            let result;
             if (this.isMacOS) {
-                return await this.installWineOnMacOS(progressCallback);
+                result = await this.installWineOnMacOS(progressCallback);
             } else if (this.isLinux) {
-                return await this.installWineOnLinux(progressCallback);
+                result = await this.installWineOnLinux(progressCallback);
+            } else {
+                result = { success: false, message: 'Unsupported platform for automatic Wine installation' };
             }
+            
+            this._wineInstalling = false;
+            return result;
         } catch (error) {
             console.error('Wine installation failed:', error);
+            this._wineInstalling = false;
             return {
                 success: false,
                 message: `Wine installation failed: ${error.message}`,
                 error: error
             };
         }
-
-        return { success: false, message: 'Unsupported platform for automatic Wine installation' };
     }
 
     // Install Wine on macOS via Homebrew
