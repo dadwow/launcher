@@ -13,7 +13,10 @@
         "build:mac": "electron-builder --mac",
         "build:linux": "electron-builder --linux",
         "build:all": "electron-builder --win --mac --linux",
-        "dist": "npm run build"
+        "dist": "npm run build",
+        "version:patch": "npm version patch",
+        "version:minor": "npm version minor",
+        "version:major": "npm version major"
     },
     "keywords": [
         "wow",

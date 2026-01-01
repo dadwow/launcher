@@ -21,20 +21,37 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
       
       - name: Check if should create release
         id: check
         run: |
           if [[ ${{ github.event_name }} == 'push' && ${{ github.ref }} == 'refs/heads/main' ]]; then
             echo "should-release=true" >> $GITHUB_OUTPUT
-            # Extract version from package.json
-            VERSION=$(node -p "require('./package.json').version")
-            echo "version=$VERSION" >> $GITHUB_OUTPUT
-            echo "Will create release for version $VERSION"
+            
+            # Auto-increment patch version
+            npm version patch --no-git-tag-version
+            NEW_VERSION=$(node -p "require('./package.json').version")
+            echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+            echo "Will create release for version $NEW_VERSION"
           else
             echo "should-release=false" >> $GITHUB_OUTPUT
             echo "Skipping release creation"
           fi
+      
+      - name: Commit version bump
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add package.json
+          git commit -m "Bump version to ${{ steps.check.outputs.version }} [skip ci]"
+          git push
 
   # Build job for all platforms
   build:
