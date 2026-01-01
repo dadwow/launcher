@@ -55,11 +55,14 @@
         "files": [
             "src/**/*",
             "assets/**/*",
-            "node_modules/**/*",
             ".env",
             "!**/.git/**/*",
             "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
-            "!**/node_modules/.bin"
+            "!**/node_modules/.bin",
+            "!src/**/*.map"
+        ],
+        "asarUnpack": [
+            "node_modules/node-stream-zip/**/*"
         ],
         "extraResources": [
             {
