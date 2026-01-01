@@ -42,7 +42,8 @@
         "files": [
             "src/**/*",
             "assets/**/*",
-            "node_modules/**/*"
+            "node_modules/**/*",
+            ".env"
         ],
         "mac": {
             "category": "public.app-category.games",
