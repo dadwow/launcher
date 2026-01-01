@@ -108,11 +108,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [ "${{ matrix.platform }}" = "mac" ]; then
-            npm run build:mac
+            npm run build:mac -- --publish always
           elif [ "${{ matrix.platform }}" = "linux" ]; then
-            npm run build:linux
+            npm run build:linux -- --publish always
           else
-            npm run build:win
+            npm run build:win -- --publish always
           fi
         shell: bash
 
@@ -138,79 +138,14 @@ jobs:
           retention-days: 5
 
   # Release job - only runs on main branch pushes
-  release:
+  # This updates the release created by electron-builder with better notes
+  update-release:
     needs: [check-release, build]
     runs-on: ubuntu-latest
     if: needs.check-release.outputs.should-release == 'true'
     
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Download all build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
-      - name: Display structure of downloaded files
-        run: ls -la artifacts/*/
-
-      - name: Prepare release files
-        run: |
-          mkdir -p release-files
-          
-          # Find and copy all files from artifacts, regardless of exact naming
-          # This handles version mismatches between build time and release time
-          
-          # Windows files
-          find artifacts/windows-build -name "*.exe" -type f 2>/dev/null | while read file; do
-            filename=$(basename "$file")
-            if [[ "$filename" == *"Setup"* ]]; then
-              cp "$file" "release-files/WoW-Launcher-Setup-v${{ needs.check-release.outputs.version }}.exe"
-              echo "Copied: $filename -> WoW-Launcher-Setup-v${{ needs.check-release.outputs.version }}.exe"
-            elif [[ "$filename" != *"Setup"* ]]; then
-              cp "$file" "release-files/WoW-Launcher-Portable-v${{ needs.check-release.outputs.version }}.exe"
-              echo "Copied: $filename -> WoW-Launcher-Portable-v${{ needs.check-release.outputs.version }}.exe"
-            fi
-          done
-          
-          # macOS files
-          find artifacts/macos-build -name "*.dmg" -type f 2>/dev/null | while read file; do
-            filename=$(basename "$file")
-            if [[ "$filename" == *"arm64"* ]]; then
-              cp "$file" "release-files/WoW-Launcher-AppleSilicon-v${{ needs.check-release.outputs.version }}.dmg"
-              echo "Copied: $filename -> WoW-Launcher-AppleSilicon-v${{ needs.check-release.outputs.version }}.dmg"
-            else
-              cp "$file" "release-files/WoW-Launcher-Intel-v${{ needs.check-release.outputs.version }}.dmg"
-              echo "Copied: $filename -> WoW-Launcher-Intel-v${{ needs.check-release.outputs.version }}.dmg"
-            fi
-          done
-          
-          # Linux AppImage
-          find artifacts/linux-build -name "*.AppImage" -type f 2>/dev/null | head -1 | while read file; do
-            cp "$file" "release-files/WoW-Launcher-v${{ needs.check-release.outputs.version }}.AppImage"
-            echo "Copied: $(basename "$file") -> WoW-Launcher-v${{ needs.check-release.outputs.version }}.AppImage"
-          done
-          
-          # Linux DEB
-          find artifacts/linux-build -name "*.deb" -type f 2>/dev/null | head -1 | while read file; do
-            cp "$file" "release-files/WoW-Launcher-v${{ needs.check-release.outputs.version }}.deb"
-            echo "Copied: $(basename "$file") -> WoW-Launcher-v${{ needs.check-release.outputs.version }}.deb"
-          done
-          
-          # Linux TAR.GZ
-          find artifacts/linux-build -name "*.tar.gz" -type f 2>/dev/null | head -1 | while read file; do
-            cp "$file" "release-files/WoW-Launcher-v${{ needs.check-release.outputs.version }}.tar.gz"
-            echo "Copied: $(basename "$file") -> WoW-Launcher-v${{ needs.check-release.outputs.version }}.tar.gz"
-          done
-          
-          echo ""
-          echo "Release files prepared:"
-          ls -lah release-files/ || echo "No files found!"
-          echo ""
-          echo "File count: $(find release-files -type f 2>/dev/null | wc -l)"
-
-      - name: Create Release
+      - name: Update Release Notes
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.check-release.outputs.version }}
@@ -248,5 +183,3 @@ jobs:
             Built with ❤️ using Electron and Node.js
           draft: false
           prerelease: false
-          files: release-files/*
-          fail_on_unmatched_files: false
