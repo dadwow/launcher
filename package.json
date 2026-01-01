@@ -26,6 +26,10 @@
     ],
     "author": "AC Launcher Team",
     "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/dadwow/launcher.git"
+    },
     "devDependencies": {
         "electron": "^28.0.0",
         "electron-builder": "^24.6.4"
@@ -34,11 +38,17 @@
         "axios": "^1.6.2",
         "fs-extra": "^11.2.0",
         "node-stream-zip": "^1.15.0",
-        "dotenv": "^16.3.1"
+        "dotenv": "^16.3.1",
+        "electron-updater": "^6.1.7"
     },
     "build": {
         "appId": "com.aclauncher.wow335a",
         "productName": "WoW 3.3.5a Launcher",
+        "publish": {
+            "provider": "github",
+            "owner": "dadwow",
+            "repo": "launcher"
+        },
         "directories": {
             "output": "dist"
         },

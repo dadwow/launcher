@@ -5,6 +5,7 @@ const os = require('os');
 const axios = require('axios');
 const StreamZip = require('node-stream-zip');
 const { spawn } = require('child_process');
+const { autoUpdater } = require('electron-updater');
 const PlatformManager = require('./platform-manager');
 require('dotenv').config();
 
@@ -33,6 +34,66 @@ const config = {
     downloadUrl: process.env.CLIENT_DOWNLOAD_URL || '',
     installPath: process.env.WOW_INSTALL_PATH || path.join(os.homedir(), 'Documents', 'World of Warcraft')
 };
+
+// Configure auto-updater
+autoUpdater.autoDownload = false;
+autoUpdater.autoInstallOnAppQuit = true;
+
+// Auto-updater event handlers
+autoUpdater.on('checking-for-update', () => {
+    console.log('Checking for update...');
+    if (mainWindow) {
+        mainWindow.webContents.send('update-status', { status: 'checking' });
+    }
+});
+
+autoUpdater.on('update-available', (info) => {
+    console.log('Update available:', info.version);
+    if (mainWindow) {
+        mainWindow.webContents.send('update-status', { 
+            status: 'available', 
+            version: info.version 
+        });
+    }
+});
+
+autoUpdater.on('update-not-available', (info) => {
+    console.log('Update not available');
+    if (mainWindow) {
+        mainWindow.webContents.send('update-status', { status: 'not-available' });
+    }
+});
+
+autoUpdater.on('error', (err) => {
+    console.error('Update error:', err);
+    if (mainWindow) {
+        mainWindow.webContents.send('update-status', { 
+            status: 'error', 
+            message: err.message 
+        });
+    }
+});
+
+autoUpdater.on('download-progress', (progressObj) => {
+    if (mainWindow) {
+        mainWindow.webContents.send('update-status', { 
+            status: 'downloading', 
+            percent: progressObj.percent,
+            transferred: progressObj.transferred,
+            total: progressObj.total
+        });
+    }
+});
+
+autoUpdater.on('update-downloaded', (info) => {
+    console.log('Update downloaded');
+    if (mainWindow) {
+        mainWindow.webContents.send('update-status', { 
+            status: 'downloaded',
+            version: info.version
+        });
+    }
+});
 
 function createWindow() {
     // Create the browser window
@@ -153,13 +214,20 @@ function createMenu() {
             label: 'Help',
             submenu: [
                 {
+                    label: 'Check for Updates',
+                    click: () => {
+                        autoUpdater.checkForUpdates();
+                    }
+                },
+                { type: 'separator' },
+                {
                     label: 'About',
                     click: () => {
                         dialog.showMessageBox(mainWindow, {
                             type: 'info',
                             title: 'About',
                             message: `${config.serverName} Launcher`,
-                            detail: 'World of Warcraft 3.3.5a Client Launcher\\nBuilt with Electron and Node.js'
+                            detail: `World of Warcraft 3.3.5a Client Launcher\nVersion: ${app.getVersion()}\nBuilt with Electron and Node.js`
                         });
                     }
                 }
@@ -168,7 +236,13 @@ function createMenu() {
     ];
 
     const menu = Menu.buildFromTemplate(template);
-    Menu.setApplicationMenu(menu);
+    
+    // Hide menu on Windows (but keep it on macOS and Linux)
+    if (process.platform === 'win32') {
+        Menu.setApplicationMenu(null);
+    } else {
+        Menu.setApplicationMenu(menu);
+    }
 }
 
 // App event handlers
@@ -178,6 +252,13 @@ app.whenReady().then(() => {
 
     createWindow();
     createMenu();
+
+    // Check for updates after a short delay (5 seconds) to let the app fully load
+    setTimeout(() => {
+        if (!config.devMode) {
+            autoUpdater.checkForUpdates();
+        }
+    }, 5000);
 
     app.on('activate', () => {
         // On macOS, re-create window when dock icon is clicked
@@ -201,8 +282,34 @@ ipcMain.handle('get-config', () => {
         defaultRealm: config.defaultRealm,
         installPath: config.installPath,
         downloadUrl: config.downloadUrl,
-        platform: platformManager.getPlatformInfo()
+        platform: platformManager.getPlatformInfo(),
+        version: app.getVersion()
     };
+});
+
+// Auto-updater IPC handlers
+ipcMain.handle('check-for-updates', async () => {
+    try {
+        const result = await autoUpdater.checkForUpdates();
+        return result;
+    } catch (error) {
+        console.error('Error checking for updates:', error);
+        throw error;
+    }
+});
+
+ipcMain.handle('download-update', async () => {
+    try {
+        await autoUpdater.downloadUpdate();
+        return true;
+    } catch (error) {
+        console.error('Error downloading update:', error);
+        throw error;
+    }
+});
+
+ipcMain.handle('install-update', () => {
+    autoUpdater.quitAndInstall(false, true);
 });
 
 ipcMain.handle('select-folder', async () => {
@@ -404,6 +511,22 @@ ipcMain.handle('launch-wow', async (event, installPath) => {
         const result = await platformManager.launchWoW(installPath, {
             prefixPath: settings.winePrefixPath || platformManager.getWinePrefixPath(installPath)
         });
+
+        // Minimize the launcher window when WoW launches
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.minimize();
+        }
+
+        // Monitor the WoW process and restore window when it closes
+        if (result.process) {
+            result.process.on('exit', () => {
+                console.log('WoW process exited, restoring launcher window');
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    mainWindow.restore();
+                    mainWindow.focus();
+                }
+            });
+        }
 
         return result.success;
     } catch (error) {

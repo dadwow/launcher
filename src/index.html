@@ -65,11 +65,26 @@
         <!-- Footer -->
         <footer class="footer">
             <div class="footer-info">
-                <span class="launcher-version">Launcher v1.0.0</span>
+                <span class="launcher-version" id="launcher-version">Launcher v1.0.0</span>
                 <span class="separator">•</span>
                 <a href="#" id="about-link">About</a>
             </div>
         </footer>
+
+        <!-- Update Notification -->
+        <div class="update-notification" id="update-notification" style="display: none;">
+            <div class="update-content">
+                <span class="update-icon">🔄</span>
+                <div class="update-info">
+                    <strong id="update-title">Update Available</strong>
+                    <span id="update-message">A new version is available</span>
+                </div>
+                <div class="update-actions">
+                    <button id="update-download-btn" class="btn btn-small btn-primary">Download</button>
+                    <button id="update-dismiss-btn" class="btn btn-small">Later</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Loading Overlay -->

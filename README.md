@@ -6,6 +6,7 @@ A modern Electron-based launcher for World of Warcraft 3.3.5a clients.
 
 - Download and manage WoW client files
 - Automatic realmlist configuration
+- **Automatic launcher updates** from GitHub releases
 - Clean, modern interface
 - Cross-platform support (Windows, macOS, Linux)
 - Environment-based configuration

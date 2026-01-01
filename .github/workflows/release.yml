@@ -146,34 +146,56 @@ jobs:
         run: |
           mkdir -p release-files
           
-          # Copy and rename Windows files
-          if [ -f "artifacts/windows-build/WoW 3.3.5a Launcher Setup ${{ needs.check-release.outputs.version }}.exe" ]; then
-            cp "artifacts/windows-build/WoW 3.3.5a Launcher Setup ${{ needs.check-release.outputs.version }}.exe" "release-files/WoW-Launcher-Setup-v${{ needs.check-release.outputs.version }}.exe"
-          fi
-          if [ -f "artifacts/windows-build/WoW 3.3.5a Launcher ${{ needs.check-release.outputs.version }}.exe" ]; then
-            cp "artifacts/windows-build/WoW 3.3.5a Launcher ${{ needs.check-release.outputs.version }}.exe" "release-files/WoW-Launcher-Portable-v${{ needs.check-release.outputs.version }}.exe"
-          fi
+          # Find and copy all files from artifacts, regardless of exact naming
+          # This handles version mismatches between build time and release time
           
-          # Copy and rename macOS files
-          if [ -f "artifacts/macos-build/WoW 3.3.5a Launcher-${{ needs.check-release.outputs.version }}.dmg" ]; then
-            cp "artifacts/macos-build/WoW 3.3.5a Launcher-${{ needs.check-release.outputs.version }}.dmg" "release-files/WoW-Launcher-Intel-v${{ needs.check-release.outputs.version }}.dmg"
-          fi
-          if [ -f "artifacts/macos-build/WoW 3.3.5a Launcher-${{ needs.check-release.outputs.version }}-arm64.dmg" ]; then
-            cp "artifacts/macos-build/WoW 3.3.5a Launcher-${{ needs.check-release.outputs.version }}-arm64.dmg" "release-files/WoW-Launcher-AppleSilicon-v${{ needs.check-release.outputs.version }}.dmg"
-          fi
+          # Windows files
+          find artifacts/windows-build -name "*.exe" -type f 2>/dev/null | while read file; do
+            filename=$(basename "$file")
+            if [[ "$filename" == *"Setup"* ]]; then
+              cp "$file" "release-files/WoW-Launcher-Setup-v${{ needs.check-release.outputs.version }}.exe"
+              echo "Copied: $filename -> WoW-Launcher-Setup-v${{ needs.check-release.outputs.version }}.exe"
+            elif [[ "$filename" != *"Setup"* ]]; then
+              cp "$file" "release-files/WoW-Launcher-Portable-v${{ needs.check-release.outputs.version }}.exe"
+              echo "Copied: $filename -> WoW-Launcher-Portable-v${{ needs.check-release.outputs.version }}.exe"
+            fi
+          done
           
-          # Copy and rename Linux files
-          if [ -f "artifacts/linux-build/WoW 3.3.5a Launcher-${{ needs.check-release.outputs.version }}.AppImage" ]; then
-            cp "artifacts/linux-build/WoW 3.3.5a Launcher-${{ needs.check-release.outputs.version }}.AppImage" "release-files/WoW-Launcher-v${{ needs.check-release.outputs.version }}.AppImage"
-          fi
-          if [ -f "artifacts/linux-build/wow-launcher_${{ needs.check-release.outputs.version }}_amd64.deb" ]; then
-            cp "artifacts/linux-build/wow-launcher_${{ needs.check-release.outputs.version }}_amd64.deb" "release-files/WoW-Launcher-v${{ needs.check-release.outputs.version }}.deb"
-          fi
-          if [ -f "artifacts/linux-build/wow-launcher-${{ needs.check-release.outputs.version }}.tar.gz" ]; then
-            cp "artifacts/linux-build/wow-launcher-${{ needs.check-release.outputs.version }}.tar.gz" "release-files/WoW-Launcher-v${{ needs.check-release.outputs.version }}.tar.gz"
-          fi
+          # macOS files
+          find artifacts/macos-build -name "*.dmg" -type f 2>/dev/null | while read file; do
+            filename=$(basename "$file")
+            if [[ "$filename" == *"arm64"* ]]; then
+              cp "$file" "release-files/WoW-Launcher-AppleSilicon-v${{ needs.check-release.outputs.version }}.dmg"
+              echo "Copied: $filename -> WoW-Launcher-AppleSilicon-v${{ needs.check-release.outputs.version }}.dmg"
+            else
+              cp "$file" "release-files/WoW-Launcher-Intel-v${{ needs.check-release.outputs.version }}.dmg"
+              echo "Copied: $filename -> WoW-Launcher-Intel-v${{ needs.check-release.outputs.version }}.dmg"
+            fi
+          done
           
-          ls -la release-files/
+          # Linux AppImage
+          find artifacts/linux-build -name "*.AppImage" -type f 2>/dev/null | head -1 | while read file; do
+            cp "$file" "release-files/WoW-Launcher-v${{ needs.check-release.outputs.version }}.AppImage"
+            echo "Copied: $(basename "$file") -> WoW-Launcher-v${{ needs.check-release.outputs.version }}.AppImage"
+          done
+          
+          # Linux DEB
+          find artifacts/linux-build -name "*.deb" -type f 2>/dev/null | head -1 | while read file; do
+            cp "$file" "release-files/WoW-Launcher-v${{ needs.check-release.outputs.version }}.deb"
+            echo "Copied: $(basename "$file") -> WoW-Launcher-v${{ needs.check-release.outputs.version }}.deb"
+          done
+          
+          # Linux TAR.GZ
+          find artifacts/linux-build -name "*.tar.gz" -type f 2>/dev/null | head -1 | while read file; do
+            cp "$file" "release-files/WoW-Launcher-v${{ needs.check-release.outputs.version }}.tar.gz"
+            echo "Copied: $(basename "$file") -> WoW-Launcher-v${{ needs.check-release.outputs.version }}.tar.gz"
+          done
+          
+          echo ""
+          echo "Release files prepared:"
+          ls -lah release-files/ || echo "No files found!"
+          echo ""
+          echo "File count: $(find release-files -type f 2>/dev/null | wc -l)"
 
       - name: Create Release
         uses: softprops/action-gh-release@v2

@@ -34,8 +34,16 @@ const elements = {
 
     // Footer
     aboutLink: document.getElementById('about-link'),
+    launcherVersion: document.getElementById('launcher-version'),
     loadingOverlay: document.getElementById('loading-overlay'),
-    loadingText: document.getElementById('loading-text')
+    loadingText: document.getElementById('loading-text'),
+
+    // Update notification
+    updateNotification: document.getElementById('update-notification'),
+    updateTitle: document.getElementById('update-title'),
+    updateMessage: document.getElementById('update-message'),
+    updateDownloadBtn: document.getElementById('update-download-btn'),
+    updateDismissBtn: document.getElementById('update-dismiss-btn')
 };
 
 // Initialize the application
@@ -56,6 +64,11 @@ async function initializeApp() {
 
         // Update UI with configuration
         elements.serverName.textContent = appState.config.serverName;
+        
+        // Update launcher version display
+        if (appState.config.version && elements.launcherVersion) {
+            elements.launcherVersion.textContent = `Launcher v${appState.config.version}`;
+        }
 
         // Use settings or fallback to config
         appState.installPath = appState.settings.installPath || appState.config.installPath || '';
@@ -416,11 +429,12 @@ async function launchWow() {
 
         await window.electronAPI.launchWow(appState.installPath);
         hideLoading();
-        showInfo('World of Warcraft launched successfully!');
+        
+        console.log('World of Warcraft launched successfully!');
 
         // Close launcher if setting is enabled
         if (appState.settings.closeOnLaunch === true) {
-            setTimeout(() => window.close(), 2000);
+            setTimeout(() => window.close(), 1000);
         }
     } catch (error) {
         console.error('Launch error:', error);
@@ -509,9 +523,87 @@ function formatBytes(bytes, decimals = 2) {
 // Initialize the app when the page loads
 document.addEventListener('DOMContentLoaded', initializeApp);
 
+// Auto-updater event handlers
+window.electronAPI.onUpdateStatus((event, data) => {
+    console.log('Update status:', data);
+    
+    switch (data.status) {
+        case 'checking':
+            console.log('Checking for updates...');
+            break;
+            
+        case 'available':
+            showUpdateNotification(data.version);
+            break;
+            
+        case 'not-available':
+            console.log('No updates available');
+            break;
+            
+        case 'downloading':
+            updateDownloadProgress(data);
+            break;
+            
+        case 'downloaded':
+            showUpdateReady(data.version);
+            break;
+            
+        case 'error':
+            console.error('Update error:', data.message);
+            break;
+    }
+});
+
+function showUpdateNotification(version) {
+    elements.updateTitle.textContent = `Update Available: v${version}`;
+    elements.updateMessage.textContent = 'A new version of the launcher is available';
+    elements.updateNotification.style.display = 'block';
+    elements.updateDownloadBtn.textContent = 'Download';
+    elements.updateDownloadBtn.disabled = false;
+}
+
+function updateDownloadProgress(data) {
+    const percent = Math.round(data.percent);
+    elements.updateTitle.textContent = 'Downloading Update...';
+    elements.updateMessage.textContent = `${percent}% complete`;
+    elements.updateDownloadBtn.textContent = `${percent}%`;
+    elements.updateDownloadBtn.disabled = true;
+}
+
+function showUpdateReady(version) {
+    elements.updateTitle.textContent = 'Update Ready';
+    elements.updateMessage.textContent = `Version ${version} is ready to install`;
+    elements.updateDownloadBtn.textContent = 'Restart & Install';
+    elements.updateDownloadBtn.disabled = false;
+    elements.updateDownloadBtn.onclick = async () => {
+        await window.electronAPI.installUpdate();
+    };
+}
+
+// Update notification button handlers
+elements.updateDownloadBtn.addEventListener('click', async () => {
+    if (elements.updateDownloadBtn.textContent === 'Download') {
+        try {
+            elements.updateDownloadBtn.disabled = true;
+            elements.updateDownloadBtn.textContent = 'Starting...';
+            await window.electronAPI.downloadUpdate();
+        } catch (error) {
+            console.error('Error downloading update:', error);
+            elements.updateDownloadBtn.disabled = false;
+            elements.updateDownloadBtn.textContent = 'Download';
+            showError('Failed to download update: ' + error.message);
+        }
+    }
+});
+
+elements.updateDismissBtn.addEventListener('click', () => {
+    elements.updateNotification.style.display = 'none';
+});
+
 // Clean up event listeners when the page unloads
 window.addEventListener('beforeunload', () => {
     window.electronAPI.removeAllListeners('download-progress');
     window.electronAPI.removeAllListeners('download-complete');
     window.electronAPI.removeAllListeners('download-error');
+    window.electronAPI.removeAllListeners('update-status');
 });

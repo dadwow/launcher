@@ -50,6 +50,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Window management
     openOptionsWindow: () => ipcRenderer.invoke('open-options-window'),
 
+    // Auto-updater
+    checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+    downloadUpdate: () => ipcRenderer.invoke('download-update'),
+    installUpdate: () => ipcRenderer.invoke('install-update'),
+    onUpdateStatus: (callback) => ipcRenderer.on('update-status', callback),
+
     // Event listeners for download progress
     onDownloadProgress: (callback) => ipcRenderer.on('download-progress', callback),
     onDownloadComplete: (callback) => ipcRenderer.on('download-complete', callback),
