@@ -1,0 +1,249 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  # Job to determine if we should create a release
+  check-release:
+    runs-on: ubuntu-latest
+    outputs:
+      should-release: ${{ steps.check.outputs.should-release }}
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Check if should create release
+        id: check
+        run: |
+          if [[ ${{ github.event_name }} == 'push' && ${{ github.ref }} == 'refs/heads/main' ]]; then
+            echo "should-release=true" >> $GITHUB_OUTPUT
+            # Extract version from package.json
+            VERSION=$(node -p "require('./package.json').version")
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            echo "Will create release for version $VERSION"
+          else
+            echo "should-release=false" >> $GITHUB_OUTPUT
+            echo "Skipping release creation"
+          fi
+
+  # Build job for all platforms
+  build:
+    needs: check-release
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+        include:
+          - os: macos-latest
+            platform: mac
+            artifact-name: macos
+          - os: ubuntu-latest  
+            platform: linux
+            artifact-name: linux
+          - os: windows-latest
+            platform: win
+            artifact-name: windows
+
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Wine (for macOS cross-compilation)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install --cask xquartz wine-stable
+
+      - name: Build application
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "${{ matrix.platform }}" = "mac" ]; then
+            npm run build:mac
+          elif [ "${{ matrix.platform }}" = "linux" ]; then
+            npm run build:linux
+          else
+            npm run build:win
+          fi
+        shell: bash
+
+      - name: List build artifacts (Debug)
+        run: |
+          echo "Contents of dist folder:"
+          ls -la dist/ || echo "No dist folder found"
+        shell: bash
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact-name }}-build
+          path: |
+            dist/*.exe
+            dist/*.dmg
+            dist/*.AppImage
+            dist/*.deb
+            dist/*.rpm
+            dist/*.snap
+            dist/*.tar.gz
+            dist/*.zip
+          retention-days: 5
+
+  # Release job - only runs on main branch pushes
+  release:
+    needs: [check-release, build]
+    runs-on: ubuntu-latest
+    if: needs.check-release.outputs.should-release == 'true'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Display structure of downloaded files
+        run: ls -la artifacts/*/
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ needs.check-release.outputs.version }}
+          release_name: WoW Launcher v${{ needs.check-release.outputs.version }}
+          body: |
+            ## WoW 3.3.5a Launcher Release v${{ needs.check-release.outputs.version }}
+
+            ### 🚀 **Cross-Platform WoW Launcher**
+            A modern, feature-rich launcher for World of Warcraft 3.3.5a with automatic Wine installation and addon management.
+
+            ### 📦 **Downloads:**
+            - **Windows**: Download the `Setup.exe` for easy installation or the portable `.exe` for no-install usage
+            - **macOS**: Download the `.dmg` file for Mac installation
+            - **Linux**: Download the `.AppImage` for universal Linux support, or use `.deb`/`.rpm` for package managers
+
+            ### ✨ **Key Features:**
+            - 🍷 **Automatic Wine Installation** - Seamless cross-platform compatibility
+            - 🔧 **Smart Action Button** - Context-aware download/launch functionality  
+            - 📦 **GitHub Addon Manager** - Easy addon installation from repositories
+            - ⚙️ **Environment Configuration** - Customizable via .env file
+            - 🎨 **Modern UI** - Clean, responsive interface
+            - 🌍 **Cross-Platform** - Windows, macOS, and Linux support
+
+            ### 🛠️ **Installation:**
+            1. Download the appropriate file for your operating system
+            2. Install/run the application
+            3. Configure your WoW installation path and server settings
+            4. Launch and enjoy!
+
+            ### 📋 **System Requirements:**
+            - **Windows**: Windows 7 or later
+            - **macOS**: macOS 10.13 or later
+            - **Linux**: Most modern distributions
+
+            Built with ❤️ using Electron and Node.js
+          draft: false
+          prerelease: false
+
+      - name: Upload Windows Setup
+        if: always()
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: artifacts/windows-build/WoW 3.3.5a Launcher Setup ${{ needs.check-release.outputs.version }}.exe
+          asset_name: WoW-Launcher-Setup-v${{ needs.check-release.outputs.version }}.exe
+          asset_content_type: application/x-msdownload
+        continue-on-error: true
+
+      - name: Upload Windows Portable
+        if: always()
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: artifacts/windows-build/WoW 3.3.5a Launcher ${{ needs.check-release.outputs.version }}.exe
+          asset_name: WoW-Launcher-Portable-v${{ needs.check-release.outputs.version }}.exe
+          asset_content_type: application/x-msdownload
+        continue-on-error: true
+
+      - name: Upload macOS DMG (Intel)
+        if: always()
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: artifacts/macos-build/WoW 3.3.5a Launcher-${{ needs.check-release.outputs.version }}.dmg
+          asset_name: WoW-Launcher-Intel-v${{ needs.check-release.outputs.version }}.dmg
+          asset_content_type: application/x-apple-diskimage
+        continue-on-error: true
+
+      - name: Upload macOS DMG (Apple Silicon)
+        if: always()
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: artifacts/macos-build/WoW 3.3.5a Launcher-${{ needs.check-release.outputs.version }}-arm64.dmg
+          asset_name: WoW-Launcher-AppleSilicon-v${{ needs.check-release.outputs.version }}.dmg
+          asset_content_type: application/x-apple-diskimage
+        continue-on-error: true
+
+      - name: Upload Linux AppImage
+        if: always()
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: artifacts/linux-build/WoW 3.3.5a Launcher-${{ needs.check-release.outputs.version }}.AppImage
+          asset_name: WoW-Launcher-v${{ needs.check-release.outputs.version }}.AppImage
+          asset_content_type: application/x-executable
+        continue-on-error: true
+
+      - name: Upload Linux DEB
+        if: always()
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: artifacts/linux-build/wow-launcher_${{ needs.check-release.outputs.version }}_amd64.deb
+          asset_name: WoW-Launcher-v${{ needs.check-release.outputs.version }}.deb
+          asset_content_type: application/vnd.debian.binary-package
+        continue-on-error: true
+
+      - name: Upload Linux TAR.GZ
+        if: always()
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: artifacts/linux-build/wow-launcher-${{ needs.check-release.outputs.version }}.tar.gz
+          asset_name: WoW-Launcher-v${{ needs.check-release.outputs.version }}.tar.gz
+          asset_content_type: application/gzip
+        continue-on-error: true
