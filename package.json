@@ -56,7 +56,16 @@
             "src/**/*",
             "assets/**/*",
             "node_modules/**/*",
-            ".env"
+            ".env",
+            "!**/.git/**/*",
+            "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
+            "!**/node_modules/.bin"
+        ],
+        "extraResources": [
+            {
+                "from": ".env",
+                "to": ".env"
+            }
         ],
         "mac": {
             "category": "public.app-category.games",

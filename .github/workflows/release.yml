@@ -85,6 +85,19 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Verify .env file exists
+        run: |
+          echo "Checking for .env file..."
+          if [ -f ".env" ]; then
+            echo ".env file found!"
+            echo "Contents:"
+            cat .env
+          else
+            echo "ERROR: .env file not found!"
+            exit 1
+          fi
+        shell: bash
+
       - name: Install Wine (for macOS cross-compilation)
         if: matrix.os == 'macos-latest'
         run: |

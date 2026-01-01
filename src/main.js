@@ -7,7 +7,23 @@ const StreamZip = require('node-stream-zip');
 const { spawn } = require('child_process');
 const { autoUpdater } = require('electron-updater');
 const PlatformManager = require('./platform-manager');
-require('dotenv').config();
+
+// Load .env from multiple possible locations
+const dotenv = require('dotenv');
+const envPaths = [
+    path.join(__dirname, '.env'),                    // Development: src/.env
+    path.join(__dirname, '..', '.env'),              // Development: root/.env
+    path.join(process.resourcesPath, '.env'),        // Production: resources/.env
+    path.join(app.getAppPath(), '.env')              // Production: app/.env
+];
+
+for (const envPath of envPaths) {
+    if (fs.existsSync(envPath)) {
+        console.log(`Loading .env from: ${envPath}`);
+        dotenv.config({ path: envPath });
+        break;
+    }
+}
 
 // Keep a global reference of the window object
 let mainWindow;
