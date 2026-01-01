@@ -369,9 +369,11 @@ ipcMain.handle('cancel-download', async () => {
 // Realmlist management
 ipcMain.handle('update-realmlist', async (event, installPath, realmAddress) => {
     try {
-        const realmlistPath = path.join(installPath, 'realmlist.wtf');
+        const realmlistPath = path.join(installPath, 'Data', 'enUS', 'realmlist.wtf');
         const realmlistContent = `set realmlist ${realmAddress}\n`;
 
+        // Ensure the Data/enUS directory exists
+        await fs.ensureDir(path.dirname(realmlistPath));
         await fs.writeFile(realmlistPath, realmlistContent, 'utf8');
         return true;
     } catch (error) {
@@ -381,7 +383,7 @@ ipcMain.handle('update-realmlist', async (event, installPath, realmAddress) => {
 
 ipcMain.handle('get-realmlist', async (event, installPath) => {
     try {
-        const realmlistPath = path.join(installPath, 'realmlist.wtf');
+        const realmlistPath = path.join(installPath, 'Data', 'enUS', 'realmlist.wtf');
 
         if (await fs.pathExists(realmlistPath)) {
             const content = await fs.readFile(realmlistPath, 'utf8');
@@ -437,18 +439,41 @@ ipcMain.handle('load-settings', async () => {
 
 // Helper function to extract zip files
 async function extractZipFile(zipPath, extractPath) {
-    return new Promise((resolve, reject) => {
-        const zip = new StreamZip.async({ file: zipPath });
+    return new Promise(async (resolve, reject) => {
+        try {
+            const zip = new StreamZip.async({ file: zipPath });
 
-        zip.extract(null, extractPath)
-            .then(() => {
-                zip.close();
-                resolve();
-            })
-            .catch((error) => {
-                zip.close();
-                reject(error);
-            });
+            await zip.extract(null, extractPath);
+            await zip.close();
+
+            // Check if extraction created a single root folder
+            const extractedContents = await fs.readdir(extractPath);
+            
+            // If there's only one item and it's a directory, move its contents up
+            if (extractedContents.length === 1) {
+                const singleItem = extractedContents[0];
+                const singleItemPath = path.join(extractPath, singleItem);
+                const stat = await fs.stat(singleItemPath);
+                
+                if (stat.isDirectory()) {
+                    // Move contents from nested folder to parent
+                    const nestedContents = await fs.readdir(singleItemPath);
+                    
+                    for (const item of nestedContents) {
+                        const oldPath = path.join(singleItemPath, item);
+                        const newPath = path.join(extractPath, item);
+                        await fs.move(oldPath, newPath);
+                    }
+                    
+                    // Remove the now-empty nested folder
+                    await fs.remove(singleItemPath);
+                }
+            }
+
+            resolve();
+        } catch (error) {
+            reject(error);
+        }
     });
 }
 

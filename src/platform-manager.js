@@ -292,7 +292,7 @@ class PlatformManager {
         const baseCheck = {
             hasExecutable: await fs.pathExists(wowExePath),
             hasData: await fs.pathExists(dataPath),
-            hasRealmlist: await fs.pathExists(path.join(installPath, 'realmlist.wtf'))
+            hasRealmlist: await fs.pathExists(path.join(installPath, 'Data', 'enUS', 'realmlist.wtf'))
         };
 
         if (this.isWindows) {
