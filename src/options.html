@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Options</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .options-container {
+            padding: 20px;
+            max-width: 100%;
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        .options-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .options-tabs {
+            display: flex;
+            margin-bottom: 30px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            padding: 4px;
+        }
+
+        .tab-button {
+            flex: 1;
+            padding: 10px 20px;
+            background: transparent;
+            border: none;
+            color: #aaa;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+            font-size: 0.9em;
+        }
+
+        .tab-button.active {
+            background: rgba(79, 172, 254, 0.2);
+            color: #4facfe;
+        }
+
+        .tab-button:hover:not(.active) {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .options-group {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .options-group h3 {
+            color: #4facfe;
+            margin-bottom: 20px;
+            font-size: 1.2em;
+            font-weight: 500;
+        }
+
+        .option-item {
+            margin-bottom: 20px;
+        }
+
+        .option-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .option-item label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #fff;
+        }
+
+        .option-item input,
+        .option-item select {
+            width: 100%;
+            padding: 12px 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            color: #fff;
+            font-size: 0.9em;
+        }
+
+        .option-item input:focus,
+        .option-item select:focus {
+            outline: none;
+            border-color: #4facfe;
+            box-shadow: 0 0 0 2px rgba(79, 172, 254, 0.2);
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .input-group input {
+            flex: 1;
+        }
+
+        .option-description {
+            font-size: 0.8em;
+            color: #aaa;
+            margin-top: 5px;
+            line-height: 1.4;
+        }
+
+        .addon-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        .addon-info {
+            flex: 1;
+        }
+
+        .addon-name {
+            font-weight: 500;
+            color: #fff;
+            margin-bottom: 4px;
+        }
+
+        .addon-description {
+            font-size: 0.8em;
+            color: #aaa;
+        }
+
+        .addon-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .addon-status {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.7em;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+
+        .addon-status.installed {
+            background: rgba(76, 175, 80, 0.2);
+            color: #4caf50;
+        }
+
+        .addon-status.downloading {
+            background: rgba(255, 193, 7, 0.2);
+            color: #ffc107;
+        }
+
+        .addon-status.error {
+            background: rgba(244, 67, 54, 0.2);
+            color: #f44336;
+        }
+
+        .options-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .test-connection {
+            margin-top: 10px;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 0.9em;
+        }
+
+        .connection-status.success {
+            background: rgba(76, 175, 80, 0.1);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            color: #4caf50;
+        }
+
+        .connection-status.error {
+            background: rgba(244, 67, 54, 0.1);
+            border: 1px solid rgba(244, 67, 54, 0.3);
+            color: #f44336;
+        }
+
+        .connection-status.testing {
+            background: rgba(255, 193, 7, 0.1);
+            border: 1px solid rgba(255, 193, 7, 0.3);
+            color: #ffc107;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="options-container">
+        <div class="options-header">
+            <h2>Options</h2>
+        </div>
+
+        <div class="options-tabs">
+            <button class="tab-button active" data-tab="general">General</button>
+            <button class="tab-button" data-tab="server">Server</button>
+            <button class="tab-button" data-tab="addons">Addons</button>
+        </div>
+
+        <!-- General Tab -->
+        <div id="general-tab" class="tab-content active">
+            <div class="options-group">
+                <h3>Installation Settings</h3>
+                <div class="option-item">
+                    <label for="install-path-options">WoW Installation Path:</label>
+                    <div class="input-group">
+                        <input type="text" id="install-path-options" readonly
+                            placeholder="Select installation directory">
+                        <button id="browse-install-path" class="btn btn-secondary">Browse</button>
+                        <button id="suggest-paths" class="btn btn-secondary">Suggest</button>
+                    </div>
+                    <div class="option-description">Directory where World of Warcraft is or will be installed</div>
+                </div>
+
+                <div class="option-item">
+                    <div id="installation-status-options" class="installation-status">
+                        <span class="status-icon">ℹ️</span>
+                        <span>Select an installation path to check WoW client status</span>
+                    </div>
+                </div>
+
+                <div id="platform-info" class="option-item" style="display: none;">
+                    <label>Platform:</label>
+                    <div id="platform-status" class="status-display">
+                        <span class="status-icon">ℹ️</span>
+                        <span id="platform-text">Loading platform information...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Wine Configuration (Non-Windows only) -->
+            <div id="wine-config-group" class="options-group" style="display: none;">
+                <h3>Wine Configuration</h3>
+                <div class="option-item">
+                    <div id="wine-status" class="status-display">
+                        <span class="status-icon">⚠️</span>
+                        <span>Checking Wine installation...</span>
+                    </div>
+                </div>
+
+                <div class="option-item" id="wine-install-instructions" style="display: none;">
+                    <label>Wine Not Found:</label>
+                    <div class="option-description" id="wine-instructions-text">
+                        Wine is required to run WoW on this platform. Please install Wine or CrossOver.
+                    </div>
+                    <button id="show-wine-instructions" class="btn btn-secondary">Installation Instructions</button>
+                </div>
+
+                <div class="option-item" id="wine-prefix-config" style="display: none;">
+                    <label for="wine-prefix-path">Wine Prefix Path:</label>
+                    <div class="input-group">
+                        <input type="text" id="wine-prefix-path" readonly>
+                        <button id="create-wine-prefix" class="btn btn-secondary">Create/Reset Prefix</button>
+                    </div>
+                    <div class="option-description">Wine prefix directory for WoW installation</div>
+                </div>
+            </div>
+
+            <div class="options-group">
+                <h3>Launcher Settings</h3>
+                <div class="option-item">
+                    <label for="auto-update-realmlist">Auto-update realmlist on launch:</label>
+                    <select id="auto-update-realmlist">
+                        <option value="true">Yes</option>
+                        <option value="false">No</option>
+                    </select>
+                    <div class="option-description">Automatically update realmlist.wtf before launching the game</div>
+                </div>
+
+                <div class="option-item">
+                    <label for="close-on-launch">Close launcher when game starts:</label>
+                    <select id="close-on-launch">
+                        <option value="false">No</option>
+                        <option value="true">Yes</option>
+                    </select>
+                    <div class="option-description">Whether to close the launcher when WoW starts</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Server Tab -->
+        <div id="server-tab" class="tab-content">
+            <div class="options-group">
+                <h3>Server Configuration</h3>
+                <div class="option-item">
+                    <label for="realm-address-options">Realm Address:</label>
+                    <input type="text" id="realm-address-options" placeholder="logon.server.com">
+                    <div class="option-description">Server address that will be written to realmlist.wtf</div>
+                </div>
+
+                <div class="option-item">
+                    <button id="test-realm-connection" class="btn btn-secondary">Test Connection</button>
+                    <div id="realm-connection-status" class="connection-status" style="display: none;">
+                        <span class="status-icon">ℹ️</span>
+                        <span class="status-text">Testing connection...</span>
+                    </div>
+                </div>
+
+                <div class="option-item">
+                    <label for="server-name-options">Server Name:</label>
+                    <input type="text" id="server-name-options" placeholder="Your WoW Server">
+                    <div class="option-description">Display name shown in the launcher title</div>
+                </div>
+
+                <div class="option-item">
+                    <label for="download-url-options">Client Download URL:</label>
+                    <input type="url" id="download-url-options" placeholder="https://example.com/wow-client.zip">
+                    <div class="option-description">URL to download the complete WoW client (ZIP format)</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Addons Tab -->
+        <div id="addons-tab" class="tab-content">
+            <div class="options-group">
+                <h3>Install Addon from GitHub</h3>
+                <div class="option-item">
+                    <label for="github-repo-url">GitHub Repository URL:</label>
+                    <div class="input-group">
+                        <input type="text" id="github-repo-url" placeholder="https://github.com/user/addon-name">
+                        <button id="install-addon-btn" class="btn btn-primary">Install</button>
+                    </div>
+                    <div class="option-description">
+                        Enter a GitHub repository URL to download and install the addon.<br>
+                        Examples: https://github.com/ElvUI-WotLK/ElvUI or just "ElvUI-WotLK/ElvUI"
+                    </div>
+                </div>
+            </div>
+
+            <div class="options-group">
+                <h3>Installed Addons</h3>
+                <div id="addon-list">
+                    <div class="addon-item">
+                        <div class="addon-info">
+                            <div class="addon-name">No addons installed</div>
+                            <div class="addon-description">Install addons from GitHub repositories above</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="options-group">
+                <h3>Addon Settings</h3>
+                <div class="option-item">
+                    <label for="auto-update-addons">Auto-update addons on launch:</label>
+                    <select id="auto-update-addons">
+                        <option value="false">No</option>
+                        <option value="true">Yes</option>
+                    </select>
+                    <div class="option-description">Automatically check for addon updates when launching the game</div>
+                </div>
+
+                <div class="option-item">
+                    <label for="addon-backup">Backup existing addons before update:</label>
+                    <select id="addon-backup">
+                        <option value="true">Yes</option>
+                        <option value="false">No</option>
+                    </select>
+                    <div class="option-description">Create backups of existing addons before installing updates</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="options-buttons">
+            <button id="cancel-options" class="btn btn-secondary">Cancel</button>
+            <div>
+                <button id="reset-options" class="btn btn-danger">Reset to Defaults</button>
+                <button id="save-options" class="btn btn-primary">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="options.js"></script>
+</body>
+
+</html>

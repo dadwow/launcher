@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WoW Launcher</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="server-info">
+                <h1 id="server-name">WoW Server</h1>
+                <div class="server-status">
+                    <span class="status-dot" id="status-dot"></span>
+                    <span id="status-text">Checking status...</span>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button id="options-button" class="btn-icon" title="Options">
+                    <span class="icon">⚙️</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Game Status Card -->
+            <div class="status-card">
+                <div class="status-info">
+                    <h3>Game Status</h3>
+                    <div id="game-status" class="status-display">
+                        <span class="status-icon">⚠️</span>
+                        <span>Checking game installation...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Area -->
+            <div class="action-area">
+                <div class="progress-container" id="progress-container" style="display: none;">
+                    <div class="progress-info">
+                        <span id="progress-text">Preparing...</span>
+                        <span id="progress-percentage">0%</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progress-fill"></div>
+                    </div>
+                    <div class="progress-controls">
+                        <button id="pause-button" class="btn btn-small">Pause</button>
+                        <button id="cancel-button" class="btn btn-small btn-danger">Cancel</button>
+                    </div>
+                </div>
+
+                <button id="main-action-button" class="main-action-btn" disabled>
+                    <span class="action-icon" id="action-icon">🎮</span>
+                    <span class="action-text" id="action-text">Configure Settings</span>
+                </button>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="footer-info">
+                <span class="launcher-version">Launcher v1.0.0</span>
+                <span class="separator">•</span>
+                <a href="#" id="about-link">About</a>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loading-overlay" style="display: none;">
+        <div class="loading-spinner"></div>
+        <p id="loading-text">Loading...</p>
+    </div>
+
+    <script src="renderer.js"></script>
+</body>
+
+</html>
