@@ -51,7 +51,9 @@ jobs:
           git config --local user.name "github-actions[bot]"
           git add package.json
           git commit -m "Bump version to ${{ steps.check.outputs.version }} [skip ci]"
+          git tag -a "v${{ steps.check.outputs.version }}" -m "Release v${{ steps.check.outputs.version }}"
           git push
+          git push --tags
 
   # Build job for all platforms
   build:
@@ -109,11 +111,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [ "${{ matrix.platform }}" = "mac" ]; then
-            npm run build:mac -- --publish always
+            npm run build:mac
           elif [ "${{ matrix.platform }}" = "linux" ]; then
-            npm run build:linux -- --publish always
+            npm run build:linux
           else
-            npm run build:win -- --publish always
+            npm run build:win
           fi
         shell: bash
 
@@ -139,14 +141,27 @@ jobs:
           retention-days: 5
 
   # Release job - only runs on main branch pushes
-  # This updates the release created by electron-builder with better notes
-  update-release:
+  release:
     needs: [check-release, build]
     runs-on: ubuntu-latest
     if: needs.check-release.outputs.should-release == 'true'
     
     steps:
-      - name: Update Release Notes
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Display structure of downloaded files
+        run: |
+          echo "=== Artifacts structure ==="
+          ls -laR artifacts/
+          echo "=== End of artifacts ==="
+
+      - name: Create Release with all artifacts
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.check-release.outputs.version }}
@@ -184,3 +199,8 @@ jobs:
             Built with ❤️ using Electron and Node.js
           draft: false
           prerelease: false
+          files: |
+            artifacts/windows-build/*
+            artifacts/macos-build/*
+            artifacts/linux-build/*
+          fail_on_unmatched_files: false
