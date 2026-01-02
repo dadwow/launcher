@@ -42,6 +42,7 @@ const elements = {
     updateNotification: document.getElementById('update-notification'),
     updateTitle: document.getElementById('update-title'),
     updateMessage: document.getElementById('update-message'),
+    updateIcon: document.querySelector('.update-icon'),
     updateDownloadBtn: document.getElementById('update-download-btn'),
     updateDismissBtn: document.getElementById('update-dismiss-btn')
 };
@@ -529,7 +530,7 @@ window.electronAPI.onUpdateStatus((event, data) => {
     
     switch (data.status) {
         case 'checking':
-            console.log('Checking for updates...');
+            showUpdateChecking();
             break;
             
         case 'available':
@@ -537,6 +538,7 @@ window.electronAPI.onUpdateStatus((event, data) => {
             break;
             
         case 'not-available':
+            hideUpdateNotification();
             console.log('No updates available');
             break;
             
@@ -550,31 +552,61 @@ window.electronAPI.onUpdateStatus((event, data) => {
             
         case 'error':
             console.error('Update error:', data.message);
+            hideUpdateNotification();
             break;
     }
 });
+
+function showUpdateChecking() {
+    elements.updateTitle.textContent = 'Checking for Updates...';
+    elements.updateMessage.textContent = 'Please wait';
+    elements.updateNotification.style.display = 'block';
+    elements.updateDownloadBtn.style.display = 'none';
+    elements.updateDismissBtn.style.display = 'none';
+    elements.updateIcon.style.animation = 'rotate 2s linear infinite';
+}
+
+function hideUpdateNotification() {
+    setTimeout(() => {
+        elements.updateNotification.style.display = 'none';
+    }, 2000);
+}
 
 function showUpdateNotification(version) {
     elements.updateTitle.textContent = `Update Available: v${version}`;
     elements.updateMessage.textContent = 'A new version of the launcher is available';
     elements.updateNotification.style.display = 'block';
+    elements.updateDownloadBtn.style.display = 'block';
+    elements.updateDismissBtn.style.display = 'block';
     elements.updateDownloadBtn.textContent = 'Download';
     elements.updateDownloadBtn.disabled = false;
+    elements.updateIcon.style.animation = 'rotate 2s linear infinite';
 }
 
 function updateDownloadProgress(data) {
     const percent = Math.round(data.percent);
+    const transferred = formatBytes(data.transferred || 0);
+    const total = formatBytes(data.total || 0);
+    
     elements.updateTitle.textContent = 'Downloading Update...';
-    elements.updateMessage.textContent = `${percent}% complete`;
+    elements.updateMessage.textContent = `${percent}% (${transferred} / ${total})`;
+    elements.updateNotification.style.display = 'block';
+    elements.updateDownloadBtn.style.display = 'block';
+    elements.updateDismissBtn.style.display = 'none';
     elements.updateDownloadBtn.textContent = `${percent}%`;
     elements.updateDownloadBtn.disabled = true;
+    elements.updateIcon.style.animation = 'rotate 2s linear infinite';
 }
 
 function showUpdateReady(version) {
-    elements.updateTitle.textContent = 'Update Ready';
+    elements.updateTitle.textContent = 'Update Ready! 🎉';
     elements.updateMessage.textContent = `Version ${version} is ready to install`;
+    elements.updateNotification.style.display = 'block';
+    elements.updateDownloadBtn.style.display = 'block';
+    elements.updateDismissBtn.style.display = 'block';
     elements.updateDownloadBtn.textContent = 'Restart & Install';
     elements.updateDownloadBtn.disabled = false;
+    elements.updateIcon.style.animation = 'none';
     elements.updateDownloadBtn.onclick = async () => {
         await window.electronAPI.installUpdate();
     };
