@@ -578,20 +578,26 @@ ipcMain.handle('load-settings', async () => {
 
 // Helper function to extract zip files
 async function extractZipFile(zipPath, extractPath) {
-    return new Promise(async (resolve, reject) => {
-        try {
-            const zip = new StreamZip.async({ file: zipPath });
+    let zip;
+    try {
+        // Ensure extract path exists
+        await fs.ensureDir(extractPath);
+        
+        // Open and extract zip file
+        zip = new StreamZip.async({ file: zipPath });
+        await zip.extract(null, extractPath);
+        await zip.close();
+        zip = null;
 
-            await zip.extract(null, extractPath);
-            await zip.close();
-
-            // Check if extraction created a single root folder
-            const extractedContents = await fs.readdir(extractPath);
+        // Check if extraction created a single root folder
+        const extractedContents = await fs.readdir(extractPath);
+        
+        // If there's only one item and it's a directory, move its contents up
+        if (extractedContents.length === 1) {
+            const singleItem = extractedContents[0];
+            const singleItemPath = path.join(extractPath, singleItem);
             
-            // If there's only one item and it's a directory, move its contents up
-            if (extractedContents.length === 1) {
-                const singleItem = extractedContents[0];
-                const singleItemPath = path.join(extractPath, singleItem);
+            try {
                 const stat = await fs.stat(singleItemPath);
                 
                 if (stat.isDirectory()) {
@@ -601,19 +607,28 @@ async function extractZipFile(zipPath, extractPath) {
                     for (const item of nestedContents) {
                         const oldPath = path.join(singleItemPath, item);
                         const newPath = path.join(extractPath, item);
-                        await fs.move(oldPath, newPath);
+                        await fs.move(oldPath, newPath, { overwrite: true });
                     }
                     
                     // Remove the now-empty nested folder
                     await fs.remove(singleItemPath);
                 }
+            } catch (statError) {
+                console.error('Error processing nested folder:', statError);
+                // Continue anyway - the extraction itself succeeded
             }
-
-            resolve();
-        } catch (error) {
-            reject(error);
         }
-    });
+    } catch (error) {
+        // Make sure to close zip if it's still open
+        if (zip) {
+            try {
+                await zip.close();
+            } catch (closeError) {
+                console.error('Error closing zip:', closeError);
+            }
+        }
+        throw new Error(`Failed to extract zip file: ${error.message}`);
+    }
 }
 
 // Addon management IPC handlers
