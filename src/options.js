@@ -331,8 +331,8 @@ function renderAddonList(addons) {
         return;
     }
 
-    elements.addonList.innerHTML = addons.map(addon => `
-        <div class="addon-item">
+    elements.addonList.innerHTML = addons.map((addon, index) => `
+        <div class="addon-item" id="addon-${index}">
             <div class="addon-info">
                 <div class="addon-name">${addon.name}</div>
                 <div class="addon-description">
@@ -342,10 +342,184 @@ function renderAddonList(addons) {
             </div>
             <div class="addon-actions">
                 <span class="addon-status installed">Installed</span>
+                ${addon.githubRepo ? `<button class="btn btn-primary btn-small" onclick="updateSingleAddon('${addon.githubRepo}', ${index})" id="update-btn-${index}">Check Update</button>` : ''}
                 <button class="btn btn-danger btn-small" onclick="uninstallAddon('${addon.name}')">Remove</button>
             </div>
         </div>
     `).join('');
+}
+
+// Check for addon updates
+async function checkForUpdates() {
+    if (!optionsState.installPath) {
+        showError('Please set installation path first');
+        return;
+    }
+
+    try {
+        const addons = optionsState.installedAddons.filter(addon => addon.githubRepo);
+        
+        if (addons.length === 0) {
+            showInfo('No addons with update information found');
+            return;
+        }
+
+        // Show checking status
+        showInfo('Checking for updates...');
+
+        const result = await window.electronAPI.checkAddonUpdates(addons);
+
+        if (result.success) {
+            const updatesAvailable = result.updates.filter(u => u.hasUpdate);
+            
+            if (updatesAvailable.length > 0) {
+                showInfo(`${updatesAvailable.length} addon(s) have updates available`);
+                
+                // Update UI to show which addons have updates
+                result.updates.forEach((update, index) => {
+                    const addonItem = optionsState.installedAddons.findIndex(a => a.githubRepo === update.githubRepo);
+                    if (addonItem >= 0) {
+                        const updateBtn = document.getElementById(`update-btn-${addonItem}`);
+                        if (updateBtn) {
+                            if (update.hasUpdate) {
+                                updateBtn.textContent = 'Update Available';
+                                updateBtn.classList.remove('btn-primary');
+                                updateBtn.classList.add('btn-success');
+                            } else {
+                                updateBtn.textContent = 'Up to Date';
+                                updateBtn.disabled = true;
+                            }
+                        }
+                    }
+                });
+
+                // Show update all button if not already visible
+                showUpdateAllButton(updatesAvailable.length);
+            } else {
+                showInfo('All addons are up to date!');
+                
+                // Mark all buttons as up to date
+                result.updates.forEach((update, index) => {
+                    const addonItem = optionsState.installedAddons.findIndex(a => a.githubRepo === update.githubRepo);
+                    if (addonItem >= 0) {
+                        const updateBtn = document.getElementById(`update-btn-${addonItem}`);
+                        if (updateBtn) {
+                            updateBtn.textContent = 'Up to Date';
+                            updateBtn.disabled = true;
+                        }
+                    }
+                });
+            }
+        } else {
+            showError(`Failed to check for updates: ${result.error}`);
+        }
+    } catch (error) {
+        console.error('Error checking for updates:', error);
+        showError('Failed to check for updates: ' + error.message);
+    }
+}
+
+// Show update all button
+function showUpdateAllButton(count) {
+    const addonListHeader = document.querySelector('.addons-tab h3');
+    if (addonListHeader && !document.getElementById('update-all-btn')) {
+        const updateAllBtn = document.createElement('button');
+        updateAllBtn.id = 'update-all-btn';
+        updateAllBtn.className = 'btn btn-success';
+        updateAllBtn.textContent = `Update All (${count})`;
+        updateAllBtn.onclick = updateAllAddons;
+        updateAllBtn.style.marginLeft = '10px';
+        addonListHeader.appendChild(updateAllBtn);
+    }
+}
+
+// Update single addon
+async function updateSingleAddon(githubRepo, addonIndex) {
+    const updateBtn = document.getElementById(`update-btn-${addonIndex}`);
+    if (!updateBtn) return;
+
+    const originalText = updateBtn.textContent;
+    updateBtn.textContent = 'Updating...';
+    updateBtn.disabled = true;
+
+    try {
+        const result = await window.electronAPI.updateAddon(githubRepo, optionsState.installPath);
+
+        if (result.success) {
+            showInfo('Addon updated successfully!');
+            updateBtn.textContent = 'Updated ✓';
+            
+            // Reload addon list after a short delay
+            setTimeout(async () => {
+                await loadInstalledAddons();
+            }, 1000);
+        } else {
+            showError(`Failed to update addon: ${result.error}`);
+            updateBtn.textContent = originalText;
+            updateBtn.disabled = false;
+        }
+    } catch (error) {
+        console.error('Error updating addon:', error);
+        showError('Failed to update addon: ' + error.message);
+        updateBtn.textContent = originalText;
+        updateBtn.disabled = false;
+    }
+}
+
+// Update all addons
+async function updateAllAddons() {
+    const updateAllBtn = document.getElementById('update-all-btn');
+    if (!updateAllBtn) return;
+
+    updateAllBtn.disabled = true;
+    updateAllBtn.textContent = 'Updating...';
+
+    try {
+        const addons = optionsState.installedAddons.filter(addon => addon.githubRepo);
+        const result = await window.electronAPI.checkAddonUpdates(addons);
+
+        if (result.success) {
+            const updatesAvailable = result.updates.filter(u => u.hasUpdate);
+            
+            let successCount = 0;
+            let failCount = 0;
+
+            for (const update of updatesAvailable) {
+                try {
+                    const updateResult = await window.electronAPI.updateAddon(update.githubRepo, optionsState.installPath);
+                    if (updateResult.success) {
+                        successCount++;
+                    } else {
+                        failCount++;
+                    }
+                } catch (error) {
+                    failCount++;
+                    console.error(`Error updating ${update.name}:`, error);
+                }
+            }
+
+            if (successCount > 0) {
+                showInfo(`Successfully updated ${successCount} addon(s)${failCount > 0 ? `, ${failCount} failed` : ''}`);
+            } else {
+                showError('Failed to update addons');
+            }
+
+            // Remove the update all button
+            updateAllBtn.remove();
+
+            // Reload addon list
+            await loadInstalledAddons();
+        } else {
+            showError(`Failed to check for updates: ${result.error}`);
+            updateAllBtn.disabled = false;
+            updateAllBtn.textContent = 'Update All';
+        }
+    } catch (error) {
+        console.error('Error updating all addons:', error);
+        showError('Failed to update addons: ' + error.message);
+        updateAllBtn.disabled = false;
+        updateAllBtn.textContent = 'Update All';
+    }
 }
 
 // Uninstall addon
