@@ -78,6 +78,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      
+      - name: Pull latest changes (including version bump)
+        run: git pull origin main
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
