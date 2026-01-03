@@ -277,6 +277,10 @@ async function browseForInstallPath() {
                 elements.installPathInput.value = selectedPath;
             }
             await checkInstallation();
+            
+            // Rescan addons with new install path
+            await loadInstalledAddons();
+            
             showToast('Installation path updated', 'success');
         }
     } catch (error) {
@@ -848,6 +852,11 @@ function setButtonFeedback(buttonId, message, type = 'success', duration = 2000)
     
     const textSpan = button.querySelector('.btn-text');
     if (textSpan) {
+        // Store original text if not already stored
+        if (!button.dataset.originalText) {
+            button.dataset.originalText = textSpan.textContent;
+        }
+        
         // Show feedback message
         textSpan.textContent = message;
         
@@ -860,6 +869,7 @@ function setButtonFeedback(buttonId, message, type = 'success', duration = 2000)
             if (button.dataset.originalText) {
                 textSpan.textContent = button.dataset.originalText;
                 button.classList.remove(`btn-feedback-${type}`);
+                delete button.dataset.originalText; // Clear stored text for next use
             }
         }, duration);
     }
