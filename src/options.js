@@ -337,16 +337,43 @@ async function installAddonFromGitHub() {
         showError('Please enter a GitHub repository URL');
         return;
     }
+    
+    // Get install path
+    const installPath = optionsState.settings.installPath || optionsState.config?.installPath;
+    if (!installPath) {
+        showError('Please set your WoW installation path first');
+        return;
+    }
 
     try {
         showStatusMessage('Installing addon...', 'info');
         
-        // For now, just show a success message
-        showStatusMessage('Addon installation feature will be available soon!', 'info');
+        // Parse GitHub URL to get owner and repo
+        const urlMatch = repoUrl.match(/github\.com\/([^\/]+)\/([^\/]+)/);
+        if (!urlMatch) {
+            showError('Invalid GitHub repository URL');
+            return;
+        }
+        
+        const [, owner, repo] = urlMatch;
+        const cleanRepo = repo.replace(/\.git$/, '');
+        
+        console.log(`Installing addon from ${owner}/${cleanRepo}`);
+        
+        const result = await proxyElectronAPICall('install-addon-from-github', owner, cleanRepo, installPath);
+        
+        if (result.success) {
+            showStatusMessage('Addon installed successfully!', 'success');
+            elements.githubRepoUrl.value = '';
+            // Reload addon list
+            await loadInstalledAddons();
+        } else {
+            showError(`Failed to install addon: ${result.error || 'Unknown error'}`);
+        }
         
     } catch (error) {
         console.error('Error installing addon:', error);
-        showError('Failed to install addon');
+        showError('Failed to install addon: ' + (error.message || error));
     }
 }
 
@@ -609,7 +636,26 @@ function showStatusMessage(message, type = 'info') {
 async function loadInstalledAddons() {
     try {
         console.log('Loading installed addons...');
-        const addons = await proxyElectronAPICall('getInstalledAddons');
+        
+        // Get install path from settings or config
+        const installPath = optionsState.settings.installPath || optionsState.config?.installPath;
+        if (!installPath) {
+            console.warn('No install path available for addon loading');
+            const addonList = document.getElementById('addon-list');
+            if (addonList) {
+                addonList.innerHTML = `
+                    <div class="addon-item">
+                        <div class="addon-info">
+                            <div class="addon-name">No install path configured</div>
+                            <div class="addon-description">Please set your WoW installation path first</div>
+                        </div>
+                    </div>
+                `;
+            }
+            return;
+        }
+        
+        const addons = await proxyElectronAPICall('get-installed-addons', installPath);
         console.log('Loaded addons:', addons);
         
         const addonList = document.getElementById('addon-list');
@@ -668,7 +714,13 @@ async function loadInstalledAddons() {
 async function uninstallAddon(addonName) {
     try {
         if (confirm(`Are you sure you want to uninstall ${addonName}?`)) {
-            await proxyElectronAPICall('uninstallAddon', addonName);
+            const installPath = optionsState.settings.installPath || optionsState.config?.installPath;
+            if (!installPath) {
+                showError('Install path not available');
+                return;
+            }
+            
+            await proxyElectronAPICall('uninstall-addon', addonName, installPath);
             showInfo(`${addonName} has been uninstalled successfully`);
             // Reload addon list
             await loadInstalledAddons();
@@ -683,10 +735,24 @@ async function uninstallAddon(addonName) {
 async function checkForUpdates() {
     try {
         showInfo('Checking for addon updates...');
-        const result = await proxyElectronAPICall('checkAddonUpdates');
         
-        if (result && result.updatesAvailable > 0) {
-            showInfo(`Found ${result.updatesAvailable} addon update(s) available!`);
+        // Get installed addons first
+        const installPath = optionsState.settings.installPath || optionsState.config?.installPath;
+        if (!installPath) {
+            showError('Install path not available');
+            return;
+        }
+        
+        const addons = optionsState.installedAddons || [];
+        if (addons.length === 0) {
+            showInfo('No addons installed to check for updates');
+            return;
+        }
+        
+        const result = await proxyElectronAPICall('check-addon-updates', addons);
+        
+        if (result && result.length > 0) {
+            showInfo(`Found ${result.length} addon update(s) available!`);
         } else {
             showInfo('All addons are up to date!');
         }
