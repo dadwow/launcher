@@ -149,8 +149,11 @@ function createWindow() {
     mainWindow = new BrowserWindow({
         width: config.width,
         height: config.height,
-        minWidth: 600,
-        minHeight: 400,
+        minWidth: config.width,
+        minHeight: config.height,
+        maxWidth: config.width,
+        maxHeight: config.height,
+        resizable: false,
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,

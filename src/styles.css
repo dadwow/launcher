@@ -695,6 +695,23 @@ body {
     background: #d32f2f;
 }
 
+/* Button feedback states */
+.btn-feedback-success {
+    background: linear-gradient(45deg, #388e3c, #4caf50) !important;
+    color: white !important;
+}
+
+.btn-feedback-error {
+    background: linear-gradient(45deg, #d32f2f, #f44336) !important;
+    color: white !important;
+}
+
+.btn-feedback-success,
+.btn-feedback-error {
+    transform: none !important;
+    box-shadow: none !important;
+}
+
 /* Footer */
 .footer {
     padding: 20px 0;
@@ -929,6 +946,15 @@ body {
     }
 }
 
+@keyframes fadeOut {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+    }
+}
+
 @keyframes slideUp {
     from {
         opacity: 0;
@@ -938,6 +964,26 @@ body {
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+}
+
+/* Closing animation classes */
+.settings-modal-backdrop.closing {
+    animation: fadeOut 0.2s ease forwards;
+}
+
+.settings-modal-content.closing {
+    animation: slideDown 0.3s ease forwards;
 }
 
 /* Ensure no scrolling */
