@@ -56,6 +56,12 @@ autoUpdater.autoDownload = false;
 autoUpdater.autoInstallOnAppQuit = true;
 autoUpdater.logger = console;
 
+// Disable signature verification for unsigned builds
+// Remove this if you sign your releases with a code signing certificate
+if (process.platform === 'win32') {
+    process.env.ELECTRON_UPDATER_ALLOW_UNSIGNED = '1';
+}
+
 // Auto-updater event handlers
 autoUpdater.on('checking-for-update', () => {
     console.log('Checking for update...');
