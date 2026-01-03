@@ -7,12 +7,12 @@
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    background: linear-gradient(135deg, rgba(26, 26, 46, 0.95) 0%, rgba(22, 33, 62, 0.95) 100%), url('../assets/bg.png');
+    background: linear-gradient(135deg, rgba(20, 10, 5, 0.85) 0%, rgba(40, 25, 15, 0.88) 50%, rgba(15, 20, 30, 0.85) 100%), url('../assets/bg.png');
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
     background-attachment: fixed;
-    color: #ffffff;
+    color: #f5e6d3;
     min-height: 100vh;
     overflow-x: hidden;
 }
@@ -35,7 +35,7 @@ body {
     justify-content: space-between;
     align-items: center;
     padding: 0 0 20px 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 2px solid rgba(218, 145, 60, 0.4);
     margin-bottom: 20px;
     flex-shrink: 0;
     /* Don't shrink header */
@@ -196,11 +196,12 @@ body {
 }
 
 .progress-container {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(35, 20, 10, 0.75);
+    border: 1px solid rgba(218, 145, 60, 0.3);
     border-radius: 12px;
     padding: 20px;
     backdrop-filter: blur(10px);
+    box-shadow: 0 2px 10px rgba(218, 145, 60, 0.15), inset 0 1px 0 rgba(255, 200, 100, 0.1);
 }
 
 .progress-info {
@@ -214,17 +215,26 @@ body {
 .progress-bar {
     width: 100%;
     height: 6px;
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(20, 10, 5, 0.9);
     border-radius: 3px;
     overflow: hidden;
     margin-bottom: 15px;
+    border: 1px solid rgba(218, 145, 60, 0.2);
 }
 
 .progress-fill {
     height: 100%;
-    background: linear-gradient(90deg, #4facfe, #00f2fe);
+    background: linear-gradient(90deg, #d4691c, #f4a540, #ffd27f, #f4a540, #d4691c);
+    background-size: 200% 100%;
+    animation: shimmer 3s linear infinite;
     width: 0%;
     transition: width 0.3s ease;
+    box-shadow: 0 0 10px rgba(244, 165, 64, 0.5);
+}
+
+@keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
 }
 
 .progress-controls {
@@ -240,49 +250,59 @@ body {
     justify-content: center;
     gap: 12px;
     padding: 20px 40px;
-    background: linear-gradient(45deg, #4facfe, #00f2fe);
-    border: none;
+    background: linear-gradient(135deg, #c85a1f, #e87538, #f4a540, #e87538, #c85a1f);
+    border: 2px solid rgba(232, 117, 56, 0.6);
     border-radius: 12px;
-    color: white;
+    color: #1a0f05;
     font-size: 1.2em;
-    font-weight: 600;
+    font-weight: 700;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.3s ease;
     min-height: 70px;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-    box-shadow: 0 4px 15px rgba(79, 172, 254, 0.3);
+    letter-spacing: 1px;
+    box-shadow: 0 4px 15px rgba(232, 117, 56, 0.5), inset 0 1px 0 rgba(255, 200, 150, 0.4), inset 0 -2px 5px rgba(0, 0, 0, 0.2);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
 .main-action-btn:hover:not(:disabled) {
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(79, 172, 254, 0.4);
+    box-shadow: 0 6px 20px rgba(244, 165, 64, 0.7), inset 0 1px 0 rgba(255, 220, 180, 0.5), inset 0 -2px 5px rgba(0, 0, 0, 0.2);
+    background: linear-gradient(135deg, #e87538, #f4a540, #ffc870, #f4a540, #e87538);
 }
 
 .main-action-btn:disabled {
-    opacity: 0.6;
+    opacity: 0.5;
     cursor: not-allowed;
     transform: none;
-    box-shadow: 0 2px 10px rgba(79, 172, 254, 0.2);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    background: linear-gradient(45deg, #5a4530, #6b5440);
+    border-color: rgba(90, 70, 50, 0.4);
 }
 
 /* Button state styles */
 .main-action-btn.ready {
-    background: linear-gradient(45deg, #28a745, #20c997);
-    box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+    background: linear-gradient(135deg, #3d7a3e, #52a855, #6bc96e, #52a855, #3d7a3e);
+    border-color: rgba(82, 168, 85, 0.6);
+    color: #0d2b0e;
+    box-shadow: 0 4px 15px rgba(61, 122, 62, 0.5), inset 0 1px 0 rgba(180, 255, 180, 0.4), inset 0 -2px 5px rgba(0, 0, 0, 0.2);
 }
 
 .main-action-btn.ready:hover:not(:disabled) {
-    box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4);
+    background: linear-gradient(135deg, #52a855, #6bc96e, #85e088, #6bc96e, #52a855);
+    box-shadow: 0 6px 20px rgba(61, 122, 62, 0.7), inset 0 1px 0 rgba(200, 255, 200, 0.5), inset 0 -2px 5px rgba(0, 0, 0, 0.2);
 }
 
 .main-action-btn.download {
-    background: linear-gradient(45deg, #17a2b8, #6f42c1);
-    box-shadow: 0 4px 15px rgba(23, 162, 184, 0.3);
+    background: linear-gradient(135deg, #4a6fa5, #5b87c7, #7aa5e0, #5b87c7, #4a6fa5);
+    border-color: rgba(91, 135, 199, 0.6);
+    color: #0a1520;
+    box-shadow: 0 4px 15px rgba(74, 111, 165, 0.5), inset 0 1px 0 rgba(150, 200, 255, 0.4), inset 0 -2px 5px rgba(0, 0, 0, 0.2);
 }
 
 .main-action-btn.download:hover:not(:disabled) {
-    box-shadow: 0 6px 20px rgba(23, 162, 184, 0.4);
+    background: linear-gradient(135deg, #5b87c7, #7aa5e0, #95c0ff, #7aa5e0, #5b87c7);
+    box-shadow: 0 6px 20px rgba(74, 111, 165, 0.7), inset 0 1px 0 rgba(180, 220, 255, 0.5), inset 0 -2px 5px rgba(0, 0, 0, 0.2);
 }
 
 .action-icon {
