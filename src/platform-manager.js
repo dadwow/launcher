@@ -237,7 +237,7 @@ class PlatformManager {
     async launchWoWWine(installPath, wineConfig) {
         const wine = await this.checkWineInstallation();
         if (!wine.installed) {
-            throw new Error('Wine is not installed. Please install Wine or CrossOver to run WoW on this platform.');
+            throw new Error('Windows compatibility layer not installed. Click "Install Compatibility Layer" to continue.');
         }
 
         const wowExePath = path.join(installPath, 'WoW.exe');
@@ -332,15 +332,15 @@ class PlatformManager {
 
         if (!wine.installed) {
             requirements.push(this.isMacOS ?
-                'Wine or CrossOver required for macOS' :
-                'Wine required for Linux'
+                'Windows compatibility layer required (Wine/CrossOver)' :
+                'Windows compatibility layer required (Wine)'
             );
         }
 
         return {
             ...baseCheck,
             isValid: baseCheck.hasExecutable && baseCheck.hasData && wine.installed,
-            platform: `${this.getPlatformName()} (Wine)`,
+            platform: `${this.getPlatformName()} (Compatibility Layer)`,
             wineInfo: wine,
             requirements: requirements
         };
@@ -349,13 +349,13 @@ class PlatformManager {
     // Automatically install Wine based on platform
     async installWineAutomatically(progressCallback = null) {
         if (this.isWindows) {
-            if (progressCallback) progressCallback('Wine not needed on Windows', 100);
-            return { success: true, message: 'Wine not needed on Windows' };
+            if (progressCallback) progressCallback('No compatibility layer needed on Windows', 100);
+            return { success: true, message: 'Running natively on Windows' };
         }
 
         this._wineInstalling = true;
         
-        if (progressCallback) progressCallback('Starting Wine installation...', 0);
+        if (progressCallback) progressCallback('Installing Windows compatibility layer...', 0);
 
         try {
             let result;
@@ -364,17 +364,17 @@ class PlatformManager {
             } else if (this.isLinux) {
                 result = await this.installWineOnLinux(progressCallback);
             } else {
-                result = { success: false, message: 'Unsupported platform for automatic Wine installation' };
+                result = { success: false, message: 'Unsupported platform for automatic installation' };
             }
             
             this._wineInstalling = false;
             return result;
         } catch (error) {
-            console.error('Wine installation failed:', error);
+            console.error('Compatibility layer installation failed:', error);
             this._wineInstalling = false;
             return {
                 success: false,
-                message: `Wine installation failed: ${error.message}`,
+                message: `Installation failed: ${error.message}`,
                 error: error
             };
         }
@@ -384,7 +384,7 @@ class PlatformManager {
     async installWineOnMacOS(progressCallback = null) {
         try {
             // Check if Homebrew is installed
-            if (progressCallback) progressCallback('Checking for Homebrew...', 10);
+            if (progressCallback) progressCallback('Checking system requirements...', 10);
             
             let hasHomebrew = false;
             try {
@@ -392,7 +392,7 @@ class PlatformManager {
                 hasHomebrew = true;
             } catch (error) {
                 // Homebrew not found, install it
-                if (progressCallback) progressCallback('Installing Homebrew...', 20);
+                if (progressCallback) progressCallback('Installing package manager...', 20);
                 
                 const installHomebrew = spawn('/bin/bash', ['-c', 
                     '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
@@ -401,32 +401,32 @@ class PlatformManager {
                 await new Promise((resolve, reject) => {
                     installHomebrew.on('close', (code) => {
                         if (code === 0) resolve();
-                        else reject(new Error(`Homebrew installation failed with code ${code}`));
+                        else reject(new Error(`Package manager installation failed with code ${code}`));
                     });
                     installHomebrew.on('error', reject);
                 });
             }
 
             // Install XQuartz
-            if (progressCallback) progressCallback('Installing XQuartz...', 40);
+            if (progressCallback) progressCallback('Installing graphics support...', 40);
             await execAsync('brew install --cask xquartz');
 
             // Install Wine
-            if (progressCallback) progressCallback('Installing Wine...', 70);
+            if (progressCallback) progressCallback('Installing compatibility layer...', 70);
             await execAsync('brew install --cask wine-stable');
 
-            if (progressCallback) progressCallback('Wine installation completed!', 100);
+            if (progressCallback) progressCallback('Setup completed!', 100);
 
             return {
                 success: true,
-                message: 'Wine installed successfully via Homebrew. Please restart your Mac for best compatibility.',
+                message: 'Compatibility layer installed successfully. Please restart your Mac for best performance.',
                 requiresRestart: true
             };
 
         } catch (error) {
             return {
                 success: false,
-                message: `Failed to install Wine on macOS: ${error.message}`,
+                message: `Failed to install compatibility layer: ${error.message}`,
                 error: error
             };
         }
@@ -437,7 +437,7 @@ class PlatformManager {
         try {
             const packageManager = await this.detectLinuxPackageManager();
             
-            if (progressCallback) progressCallback(`Installing Wine via ${packageManager}...`, 30);
+            if (progressCallback) progressCallback(`Installing compatibility layer via ${packageManager}...`, 30);
 
             let installCommand;
             switch (packageManager) {

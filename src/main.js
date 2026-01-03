@@ -63,6 +63,11 @@ let downloadState = {
 };
 
 // App configuration from environment
+console.log('Environment variables loaded:');
+console.log('DEFAULT_REALM:', process.env.DEFAULT_REALM);
+console.log('SERVER_NAME:', process.env.SERVER_NAME);
+console.log('CLIENT_DOWNLOAD_URL:', process.env.CLIENT_DOWNLOAD_URL);
+
 const config = {
     width: parseInt(process.env.WINDOW_WIDTH) || 800,
     height: parseInt(process.env.WINDOW_HEIGHT) || 600,
@@ -155,7 +160,14 @@ function createWindow() {
         title: `${config.serverName} Launcher`,
         icon: path.join(__dirname, '../assets/icon.png'),
         show: false, // Don't show until ready
-        titleBarStyle: 'default'
+        frame: false, // Frameless window for custom title bar
+        transparent: false, // Keep false for better performance
+        backgroundColor: '#0a1520',
+        titleBarStyle: 'hidden', // Hide default title bar on macOS
+        roundedCorners: true, // Enable rounded corners (Windows 11)
+        ...(process.platform === 'win32' && {
+            backgroundMaterial: 'acrylic' // Windows 11 acrylic effect
+        })
     });
 
     console.log('Window created, loading index.html...');
@@ -221,7 +233,11 @@ function createSettingsWindow() {
         title: 'Options',
         resizable: true,
         minimizable: false,
-        maximizable: false
+        maximizable: false,
+        frame: false, // Frameless for consistency
+        backgroundColor: '#0a1520',
+        titleBarStyle: 'hidden',
+        roundedCorners: true
     });
 
     optionsWindow.loadFile(path.join(__dirname, 'options.html'));
@@ -402,6 +418,28 @@ ipcMain.handle('download-update', async () => {
 
 ipcMain.handle('install-update', () => {
     autoUpdater.quitAndInstall(false, true);
+});
+
+// Window controls for frameless window
+ipcMain.handle('window-minimize', (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (window) window.minimize();
+});
+
+ipcMain.handle('window-maximize', (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (window) {
+        if (window.isMaximized()) {
+            window.unmaximize();
+        } else {
+            window.maximize();
+        }
+    }
+});
+
+ipcMain.handle('window-close', (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (window) window.close();
 });
 
 ipcMain.handle('select-folder', async () => {
@@ -1521,12 +1559,6 @@ ipcMain.handle('install-wine-automatically', async (event) => {
 
 ipcMain.handle('check-wine-installing', () => {
     return platformManager.isWineInstalling();
-});
-
-// Window management
-ipcMain.handle('open-options-window', () => {
-    createSettingsWindow();
-    return true;
 });
 
 // Helper function to load settings

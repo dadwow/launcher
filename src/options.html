@@ -4,9 +4,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Options</title>
+    <title>Settings</title>
     <link rel="stylesheet" href="styles.css">
     <style>
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 12px;
+            height: 12px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(20, 10, 5, 0.6);
+            border-radius: 6px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, #c85a1f, #f4a540);
+            border-radius: 6px;
+            border: 2px solid rgba(20, 10, 5, 0.6);
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(180deg, #da913c, #ffb85f);
+        }
+
+        ::-webkit-scrollbar-corner {
+            background: rgba(20, 10, 5, 0.6);
+        }
+
         .options-container {
             padding: 20px;
             max-width: 100%;
@@ -44,8 +69,8 @@
         }
 
         .tab-button.active {
-            background: rgba(79, 172, 254, 0.2);
-            color: #4facfe;
+            background: rgba(244, 165, 64, 0.2);
+            color: #f4a540;
         }
 
         .tab-button:hover:not(.active) {
@@ -71,7 +96,7 @@
         }
 
         .options-group h3 {
-            color: #4facfe;
+            color: #f4a540;
             margin-bottom: 20px;
             font-size: 1.2em;
             font-weight: 500;
@@ -106,8 +131,8 @@
         .option-item input:focus,
         .option-item select:focus {
             outline: none;
-            border-color: #4facfe;
-            box-shadow: 0 0 0 2px rgba(79, 172, 254, 0.2);
+            border-color: #f4a540;
+            box-shadow: 0 0 0 2px rgba(244, 165, 64, 0.2);
         }
 
         .input-group {
@@ -424,14 +449,27 @@
 </head>
 
 <body>
+    <!-- Custom Title Bar -->
+    <div class="title-bar">
+        <div class="title-bar-title">Settings</div>
+        <div class="title-bar-drag-region"></div>
+        <div class="title-bar-controls">
+            <button class="title-bar-button close-btn" id="close-btn" title="Close">
+                <svg width="12" height="12" viewBox="0 0 12 12">
+                    <line x1="1" y1="1" x2="11" y2="11" stroke="currentColor" stroke-width="1"/>
+                    <line x1="11" y1="1" x2="1" y2="11" stroke="currentColor" stroke-width="1"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
     <div class="options-container">
         <div class="options-header">
-            <h2>Options</h2>
+            <h2>Settings</h2>
         </div>
 
         <div class="options-tabs">
             <button class="tab-button active" data-tab="addons">Addons</button>
-            <button class="tab-button" data-tab="server">Server</button>
             <button class="tab-button" data-tab="advanced">Advanced</button>
         </div>
 
@@ -489,26 +527,6 @@
                         <option value="false">No</option>
                     </select>
                     <div class="option-description">Create backups of existing addons before installing updates</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Server Tab -->
-        <div id="server-tab" class="tab-content">
-            <div class="options-group">
-                <h3>Server Configuration</h3>
-                <div class="option-item">
-                    <label for="realm-address-options">Realm Address:</label>
-                    <input type="text" id="realm-address-options" placeholder="logon.server.com">
-                    <div class="option-description">Server address that will be written to realmlist.wtf</div>
-                </div>
-
-                <div class="option-item">
-                    <button id="test-realm-connection" class="btn btn-secondary">Test Connection</button>
-                    <div id="realm-connection-status" class="connection-status" style="display: none;">
-                        <span class="status-icon">ℹ️</span>
-                        <span class="status-text">Testing connection...</span>
-                    </div>
                 </div>
             </div>
         </div>
@@ -598,25 +616,26 @@
                     <div class="option-description">URL to download the complete WoW client (ZIP format)</div>
                 </div>
             </div>
-        </div>
 
-        <!-- Server Tab -->
-        <div id="server-tab" class="tab-content">
             <div class="options-group">
-                <h3>Server Configuration</h3>
-                <div class="option-item">
-                    <label for="realm-address-options">Realm Address:</label>
-                    <input type="text" id="realm-address-options" placeholder="logon.server.com">
-                    <div class="option-description">Server address that will be written to realmlist.wtf</div>
-                </div>
-
-                <div class="option-item">
-                    <button id="test-realm-connection" class="btn btn-secondary">Test Connection</button>
-                    <div id="realm-connection-status" class="connection-status" style="display: none;">
-                        <span class="status-icon">ℹ️</span>
-                        <span class="status-text">Testing connection...</span>
+                <details>
+                    <summary style="cursor: pointer; font-weight: 600; padding: 10px; background: rgba(255, 255, 255, 0.05); border-radius: 6px; margin-bottom: 15px;">
+                        Server Configuration
+                    </summary>
+                    <div class="option-item">
+                        <label for="realm-address-options">Realm Address:</label>
+                        <input type="text" id="realm-address-options" placeholder="logon.server.com">
+                        <div class="option-description">Server address that will be written to realmlist.wtf</div>
                     </div>
-                </div>
+
+                    <div class="option-item">
+                        <button id="test-realm-connection" class="btn btn-secondary">Test Connection</button>
+                        <div id="realm-connection-status" class="connection-status" style="display: none;">
+                            <span class="status-icon">ℹ️</span>
+                            <span class="status-text">Testing connection...</span>
+                        </div>
+                    </div>
+                </details>
             </div>
         </div>
 
