@@ -156,6 +156,9 @@ function initializeWithData(config, settings) {
         // Populate form with current values
         populateForm();
 
+        // Load installed addons
+        await loadInstalledAddons();
+
         // Set up event listeners
         setupEventListeners();
 
@@ -264,7 +267,7 @@ function switchTab(tabName) {
 // Browse for installation path
 async function browseForInstallPath() {
     try {
-        const selectedPath = await electronAPI.call('selectFolder');
+        const selectedPath = await proxyElectronAPICall('selectFolder');
         if (selectedPath) {
             optionsState.installPath = selectedPath;
             if (elements.installPathInput) {
@@ -286,7 +289,7 @@ async function checkInstallation() {
     }
 
     try {
-        const installationCheck = await electronAPI.call('checkWowInstallation', optionsState.installPath);
+        const installationCheck = await proxyElectronAPICall('checkWowInstallation', optionsState.installPath);
 
         if (installationCheck.isValid) {
             updateInstallationStatus('success', 'WoW client found and ready to launch.');
@@ -311,7 +314,7 @@ async function testRealmConnection() {
     try {
         updateConnectionStatus('testing', 'Testing connection to realm...');
 
-        const result = await electronAPI.call('testRealmConnection', realmAddress);
+        const result = await proxyElectronAPICall('testRealmConnection', realmAddress);
 
         if (result.success) {
             updateConnectionStatus('success', `Connection successful! Ping: ${result.ping}ms`);
@@ -358,7 +361,7 @@ async function saveOptions() {
             addonBackup: elements.addonBackup?.checked || false
         };
 
-        await electronAPI.call('saveSettings', settings);
+        await proxyElectronAPICall('saveSettings', settings);
         showInfo('Settings saved successfully!');
 
         // Close modal after a short delay
@@ -598,6 +601,80 @@ function updateConnectionStatus(type, message) {
 function showStatusMessage(message, type = 'info') {
     console.log(`${type.toUpperCase()}: ${message}`);
     // You can implement a toast notification system here
+}
+
+// Load and display installed addons
+async function loadInstalledAddons() {
+    try {
+        console.log('Loading installed addons...');
+        const addons = await proxyElectronAPICall('getInstalledAddons');
+        console.log('Loaded addons:', addons);
+        
+        const addonList = document.getElementById('addon-list');
+        if (!addonList) {
+            console.warn('Addon list element not found');
+            return;
+        }
+        
+        if (!addons || addons.length === 0) {
+            addonList.innerHTML = `
+                <div class="addon-item">
+                    <div class="addon-info">
+                        <div class="addon-name">No addons installed</div>
+                        <div class="addon-description">Install addons from GitHub repositories above</div>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+        
+        // Display installed addons
+        addonList.innerHTML = addons.map(addon => `
+            <div class="addon-item">
+                <div class="addon-info">
+                    <div class="addon-name">${addon.name || 'Unknown Addon'}</div>
+                    <div class="addon-description">${addon.description || 'No description available'}</div>
+                    <div class="addon-version">Version: ${addon.version || 'Unknown'}</div>
+                </div>
+                <div class="addon-actions">
+                    <div class="addon-status installed">Installed</div>
+                    <button class="btn btn-danger btn-sm" onclick="uninstallAddon('${addon.name}')">Remove</button>
+                </div>
+            </div>
+        `).join('');
+        
+        // Store loaded addons in state
+        optionsState.installedAddons = addons;
+        
+    } catch (error) {
+        console.error('Failed to load installed addons:', error);
+        const addonList = document.getElementById('addon-list');
+        if (addonList) {
+            addonList.innerHTML = `
+                <div class="addon-item">
+                    <div class="addon-info">
+                        <div class="addon-name">Error loading addons</div>
+                        <div class="addon-description">Failed to load addon list: ${error.message}</div>
+                    </div>
+                </div>
+            `;
+        }
+    }
+}
+
+// Uninstall addon function
+async function uninstallAddon(addonName) {
+    try {
+        if (confirm(`Are you sure you want to uninstall ${addonName}?`)) {
+            await proxyElectronAPICall('uninstallAddon', addonName);
+            showInfo(`${addonName} has been uninstalled successfully`);
+            // Reload addon list
+            await loadInstalledAddons();
+        }
+    } catch (error) {
+        console.error('Failed to uninstall addon:', error);
+        showError(`Failed to uninstall ${addonName}: ${error.message}`);
+    }
 }
 
 // Check for addon updates
