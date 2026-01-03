@@ -125,17 +125,20 @@ async function initializeApp() {
         hideLoading();
         
         // Show detailed error in production
-        const errorDetails = `
+        const errorDetails = `Failed to initialize launcher
+
 Error: ${error.message}
 
-Stack: ${error.stack}
+Location: ${error.fileName || 'unknown'}:${error.lineNumber || '?'}
 
 Config loaded: ${appState.config ? 'Yes' : 'No'}
 Platform info: ${appState.platform ? 'Yes' : 'No'}
-        `.trim();
+
+Stack trace:
+${error.stack || 'No stack trace available'}`;
         
         console.log('Full error details:', errorDetails);
-        showError('Failed to initialize launcher. Please restart the application.');
+        alert(errorDetails);
     }
 }
 
