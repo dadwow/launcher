@@ -60,6 +60,7 @@
         "files": [
             "src/**/*",
             "assets/**/*",
+            "build/icon.png",
             ".env",
             "!**/.git/**/*",
             "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
@@ -75,10 +76,10 @@
                 "to": ".env"
             }
         ],
-        "icon": "assets/icon.png",
+        "icon": "build/icon.png",
         "mac": {
             "category": "public.app-category.games",
-            "icon": "assets/icon.png",
+            "icon": "build/icon.png",
             "artifactName": "PlusCraft-Launcher-${arch}.${ext}",
             "target": [
                 {
@@ -98,7 +99,7 @@
             ]
         },
         "win": {
-            "icon": "assets/icon.png",
+            "icon": "build/icon.png",
             "artifactName": "PlusCraft-Launcher-${arch}.${ext}",
             "target": [
                 {
@@ -132,7 +133,7 @@
             "uninstallDisplayName": "PlusCraft Launcher"
         },
         "linux": {
-            "icon": "assets/icon.png",
+            "icon": "build/icon.png",
             "artifactName": "PlusCraft-Launcher-${arch}.${ext}",
             "target": [
                 {
