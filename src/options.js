@@ -119,6 +119,10 @@ function setupEventListeners() {
             installAddonFromGitHub();
         }
     });
+    elements.githubRepoUrl.addEventListener('input', debounce(validateRepoUrl, 800));
+    elements.githubRepoUrl.addEventListener('paste', () => {
+        setTimeout(() => validateRepoUrl(), 100);
+    });
 
     // Button events
     elements.cancelOptions.addEventListener('click', () => window.close());
@@ -755,6 +759,215 @@ async function createWinePrefix() {
         elements.createWinePrefix.textContent = 'Create/Reset Prefix';
     }
 }
+
+// State for repo validation
+let repoValidationState = {
+    currentValidation: null,
+    validatedRepoData: null
+};
+
+// Debounce helper
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+// Validate repository URL
+async function validateRepoUrl() {
+    const repoUrl = elements.githubRepoUrl.value.trim();
+    const validationEl = document.getElementById('repo-validation');
+    const validationText = document.getElementById('repo-validation-text');
+
+    // Clear previous validation
+    repoValidationState.validatedRepoData = null;
+    validationEl.className = 'repo-validation';
+
+    if (!repoUrl) {
+        return;
+    }
+
+    // Parse URL
+    const repoInfo = parseGitHubUrl(repoUrl);
+    if (!repoInfo) {
+        validationEl.className = 'repo-validation invalid';
+        validationText.textContent = 'Invalid GitHub URL format';
+        return;
+    }
+
+    // Show validating state
+    validationEl.className = 'repo-validation validating';
+    validationText.textContent = 'Validating repository...';
+
+    try {
+        const result = await window.electronAPI.validateAddonRepo(repoInfo.owner, repoInfo.repo);
+
+        if (result.valid) {
+            validationEl.className = 'repo-validation valid';
+            let addonInfo = '';
+            if (result.addonInfo.hasTocInRoot) {
+                addonInfo = `Found ${result.addonInfo.tocFiles.length} addon(s) in root`;
+            } else {
+                addonInfo = `Found ${result.addonInfo.addonFolders.length} addon folder(s)`;
+            }
+            validationText.innerHTML = `✓ Valid WoW addon - ${addonInfo} <a href="#" onclick="showRepoModal(); return false;" style="color: #4a6fa5; text-decoration: underline;">View Details</a>`;
+            
+            // Store validation data for modal
+            repoValidationState.validatedRepoData = result;
+        } else {
+            validationEl.className = 'repo-validation invalid';
+            validationText.textContent = result.error || 'Not a valid WoW addon (no .toc files found)';
+        }
+    } catch (error) {
+        validationEl.className = 'repo-validation invalid';
+        validationText.textContent = 'Error validating repository';
+        console.error('Validation error:', error);
+    }
+}
+
+// Show repo info modal
+function showRepoModal() {
+    if (!repoValidationState.validatedRepoData) return;
+
+    const data = repoValidationState.validatedRepoData;
+    const modal = document.getElementById('repo-info-modal');
+    const repoTitle = document.getElementById('modal-repo-title');
+    const repoInfo = document.getElementById('modal-repo-info');
+    const readmeContent = document.getElementById('modal-readme-content');
+    const releasesContent = document.getElementById('modal-releases-content');
+    const installBtn = document.getElementById('modal-install-btn');
+
+    // Set title
+    repoTitle.textContent = data.repoData.fullName;
+
+    // Set repo info
+    repoInfo.innerHTML = `
+        <div class="repo-info-item">
+            <span class="repo-info-label">Description:</span>
+            ${data.repoData.description || 'No description'}
+        </div>
+        <div class="repo-info-item">
+            <span class="repo-info-label">Stars:</span>
+            ${data.repoData.stars || 0} ⭐
+        </div>
+        <div class="repo-info-item">
+            <span class="repo-info-label">Language:</span>
+            ${data.repoData.language || 'N/A'}
+        </div>
+        <div class="repo-info-item">
+            <span class="repo-info-label">Last Updated:</span>
+            ${new Date(data.repoData.updatedAt).toLocaleDateString()}
+        </div>
+        <div class="repo-info-item">
+            <span class="repo-info-label">Addon Structure:</span>
+            ${data.addonInfo.hasTocInRoot 
+                ? `Root contains: ${data.addonInfo.tocFiles.join(', ')}`
+                : `${data.addonInfo.addonFolders.length} addon folder(s): ${data.addonInfo.addonFolders.map(f => f.folder).join(', ')}`
+            }
+        </div>
+    `;
+
+    // Set README
+    if (data.readme) {
+        // Convert markdown to HTML (basic conversion)
+        readmeContent.innerHTML = convertMarkdownToHtml(data.readme);
+    } else {
+        readmeContent.innerHTML = '<p style="color: #888;">No README available</p>';
+    }
+
+    // Set releases
+    if (data.releases && data.releases.length > 0) {
+        let releasesHtml = '';
+        data.releases.forEach(release => {
+            releasesHtml += `
+                <div style="margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid rgba(218, 145, 60, 0.2);">
+                    <h3 style="margin: 0 0 10px 0;">${release.name || release.tag_name}</h3>
+                    <p style="color: #888; font-size: 0.9em; margin: 5px 0;">
+                        Released ${new Date(release.published_at).toLocaleDateString()} by ${release.author?.login || 'Unknown'}
+                    </p>
+                    <div>${convertMarkdownToHtml(release.body || 'No release notes')}</div>
+                </div>
+            `;
+        });
+        releasesContent.innerHTML = releasesHtml;
+    } else {
+        releasesContent.innerHTML = '<p style="color: #888;">No releases available</p>';
+    }
+
+    // Set install button handler
+    installBtn.onclick = () => {
+        closeRepoModal();
+        installAddonFromGitHub();
+    };
+
+    // Show modal
+    modal.classList.add('active');
+}
+
+// Close modal
+function closeRepoModal() {
+    const modal = document.getElementById('repo-info-modal');
+    modal.classList.remove('active');
+}
+
+// Switch modal tabs
+function switchModalTab(tabName) {
+    const tabs = document.querySelectorAll('.modal-tab');
+    const tabContents = document.querySelectorAll('.modal-tab-content');
+
+    tabs.forEach(tab => {
+        if (tab.textContent.toLowerCase().includes(tabName)) {
+            tab.classList.add('active');
+        } else {
+            tab.classList.remove('active');
+        }
+    });
+
+    tabContents.forEach(content => {
+        if (content.id === `modal-tab-${tabName}`) {
+            content.classList.add('active');
+        } else {
+            content.classList.remove('active');
+        }
+    });
+}
+
+// Basic markdown to HTML converter
+function convertMarkdownToHtml(markdown) {
+    if (!markdown) return '';
+
+    let html = markdown
+        // Headers
+        .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+        .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+        .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+        // Bold
+        .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
+        // Italic
+        .replace(/\*(.*?)\*/gim, '<em>$1</em>')
+        // Links
+        .replace(/\[([^\]]+)\]\(([^)]+)\)/gim, '<a href="$2" target="_blank" style="color: #4a6fa5;">$1</a>')
+        // Code blocks
+        .replace(/```([\s\S]*?)```/gim, '<pre><code>$1</code></pre>')
+        // Inline code
+        .replace(/`([^`]+)`/gim, '<code>$1</code>')
+        // Line breaks
+        .replace(/\n\n/g, '</p><p>')
+        .replace(/\n/g, '<br>');
+
+    return `<p>${html}</p>`;
+}
+
+// Make functions available globally for onclick handlers
+window.showRepoModal = showRepoModal;
+window.closeRepoModal = closeRepoModal;
+window.switchModalTab = switchModalTab;
 
 async function suggestInstallPaths() {
     try {
