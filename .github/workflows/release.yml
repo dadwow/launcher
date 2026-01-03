@@ -161,8 +161,10 @@ jobs:
           fetch-depth: 0
           ref: main
       
-      - name: Fetch tags
-        run: git fetch --tags
+      - name: Pull latest changes and fetch tags
+        run: |
+          git pull origin main
+          git fetch --tags --force
 
       - name: Download all build artifacts
         uses: actions/download-artifact@v4
@@ -242,16 +244,15 @@ jobs:
           draft: false
           prerelease: false
           files: |
-            artifacts/windows-build/*.exe
-            artifacts/windows-build/*.yml
+            artifacts/windows-build/PlusCraft-Launcher*.exe
+            artifacts/windows-build/latest.yml
             artifacts/windows-build/*.blockmap
             artifacts/macos-build/*.dmg
-            artifacts/macos-build/*.yml
+            artifacts/macos-build/latest-mac.yml
             artifacts/macos-build/*.blockmap
             artifacts/macos-build/*.zip
             artifacts/linux-build/*.AppImage
-            artifacts/linux-build/*.yml
+            artifacts/linux-build/latest-linux.yml
             artifacts/linux-build/*.deb
-            artifacts/linux-build/*.rpm
             artifacts/linux-build/*.tar.gz
           fail_on_unmatched_files: false
