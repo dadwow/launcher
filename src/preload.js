@@ -63,6 +63,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onDownloadComplete: (callback) => ipcRenderer.on('download-complete', callback),
     onDownloadError: (callback) => ipcRenderer.on('download-error', callback),
     
+    // Event listener for extraction progress
+    onExtractionProgress: (callback) => ipcRenderer.on('extraction-progress', callback),
+    
     // Event listeners for Wine installation progress
     onWineInstallProgress: (callback) => ipcRenderer.on('wine-install-progress', callback),
 

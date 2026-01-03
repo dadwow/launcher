@@ -87,11 +87,14 @@ class PlatformManager {
             { command: '/opt/homebrew/bin/wine', type: 'wine-homebrew-m1' }
         ];
 
-        // Check for CrossOver on macOS
+        // Check for CrossOver on macOS (prioritized for Apple Silicon)
         if (this.isMacOS) {
             const crossoverPaths = [
+                '/Applications/CrossOver.app/Contents/SharedSupport/CrossOver/bin/wine64',
                 '/Applications/CrossOver.app/Contents/SharedSupport/CrossOver/bin/wine',
-                '/Applications/CrossOver.app/Contents/SharedSupport/CrossOver/bin/wine64'
+                // Check for CrossOver installed in user Applications
+                path.join(os.homedir(), 'Applications/CrossOver.app/Contents/SharedSupport/CrossOver/bin/wine64'),
+                path.join(os.homedir(), 'Applications/CrossOver.app/Contents/SharedSupport/CrossOver/bin/wine')
             ];
 
             for (const crossoverPath of crossoverPaths) {
@@ -100,7 +103,8 @@ class PlatformManager {
                         installed: true,
                         type: 'crossover',
                         path: crossoverPath,
-                        version: await this.getWineVersion(crossoverPath)
+                        version: await this.getWineVersion(crossoverPath),
+                        isAppleSilicon: os.arch() === 'arm64'
                     };
                 }
             }
@@ -260,8 +264,26 @@ class PlatformManager {
         // Platform-specific optimizations
         if (this.isMacOS) {
             env.DYLD_FALLBACK_LIBRARY_PATH = '/usr/lib';
-            // Disable Mac-specific Wine features that might interfere
-            env.WINE_MAC_DRIVER = '0';
+            
+            // CrossOver and Apple Silicon optimizations
+            if (wine.type === 'crossover') {
+                env.CX_BOTTLE = 'WoW335a';
+                env.CX_LOG = 'warn'; // Reduce log verbosity
+                
+                // Apple Silicon specific: Use libsillicon/turtlesillicon patches
+                if (os.arch() === 'arm64' || wine.isAppleSilicon) {
+                    // Enable Rosetta 2 translation with optimizations
+                    env.DYLD_LIBRARY_PATH = '/opt/homebrew/lib';
+                    env.WINE_LARGE_ADDRESS_AWARE = '1';
+                    
+                    // CrossOver-specific Apple Silicon flags
+                    env.CX_PLATFORM = 'arm64';
+                    env.MTL_HUD_ENABLED = '0'; // Disable Metal HUD for performance
+                }
+            } else {
+                // Standard Wine on macOS
+                env.WINE_MAC_DRIVER = '0';
+            }
         } else if (this.isLinux) {
             // Linux-specific optimizations
             env.WINEDEBUG = '-all'; // Disable debug output for performance
@@ -523,23 +545,37 @@ class PlatformManager {
     getWineInstallInstructions() {
         if (this.isWindows) return null;
 
+        const isAppleSilicon = os.arch() === 'arm64';
+
         if (this.isMacOS) {
             return {
-                title: 'Manual Wine Installation on macOS',
-                note: 'Automatic installation is recommended. Use these steps only if automatic installation fails.',
+                title: isAppleSilicon ? 'CrossOver Recommended for Apple Silicon' : 'Wine Installation Options for macOS',
+                note: isAppleSilicon 
+                    ? 'CrossOver is highly recommended for Apple Silicon Macs for optimal WoW 3.3.5a performance with native ARM64 support.'
+                    : 'Automatic installation is recommended. Use these steps only if automatic installation fails.',
                 methods: [
                     {
-                        name: 'CrossOver (Commercial)',
-                        description: 'Professional Wine distribution with excellent WoW support',
-                        url: 'https://www.codeweavers.com/crossover'
+                        name: 'CrossOver (Recommended' + (isAppleSilicon ? ' - Apple Silicon Optimized' : '') + ')',
+                        description: isAppleSilicon 
+                            ? 'Professional Wine distribution with native Apple Silicon support and libsillicon optimizations'
+                            : 'Professional Wine distribution with excellent WoW support',
+                        url: 'https://www.codeweavers.com/crossover',
+                        features: [
+                            'One-click bottle creation',
+                            'Optimized for gaming',
+                            isAppleSilicon ? 'Native ARM64 with Metal support' : 'Excellent x86_64 compatibility',
+                            'Regular updates'
+                        ],
+                        priority: 'recommended'
                     },
                     {
-                        name: 'Homebrew Wine (Free)',
+                        name: 'Homebrew Wine (Free' + (isAppleSilicon ? ' - Limited Apple Silicon support' : '') + ')',
                         description: 'Install via command line',
                         steps: [
                             'Install Homebrew if not present',
                             'Run: brew install --cask xquartz wine-stable'
-                        ]
+                        ],
+                        note: isAppleSilicon ? 'May have performance issues on Apple Silicon Macs' : null
                     }
                 ]
             };

@@ -138,6 +138,9 @@ function setupEventListeners() {
     window.electronAPI.onDownloadComplete(handleDownloadComplete);
     window.electronAPI.onDownloadError(handleDownloadError);
     
+    // Extraction progress listener
+    window.electronAPI.onExtractionProgress(handleExtractionProgress);
+    
     // Wine installation progress listener
     window.electronAPI.onWineInstallProgress(handleWineInstallProgress);
 
@@ -167,14 +170,7 @@ async function openOptions() {
 // Check game installation status
 async function checkGameStatus() {
     if (!appState.installPath) {
-        let message = 'Please configure installation path in Options.';
-        if (appState.platform.needsWine && !appState.wineInfo?.installed) {
-            message = `Installing Wine for ${appState.platform.platformName}...`;
-            updateGameStatus('warning', message);
-            updateMainActionButton('configure', 'Install Wine', true);
-            return;
-        }
-        updateGameStatus('warning', message);
+        updateGameStatus('warning', 'Please configure installation path in Options.');
         updateMainActionButton('configure', 'Configure Settings', false);
         return;
     }
@@ -182,15 +178,8 @@ async function checkGameStatus() {
     try {
         const installationCheck = await window.electronAPI.checkWowInstallation(appState.installPath);
         
-        if (installationCheck.isValid) {
-            appState.isWowInstalled = true;
-            let statusMessage = `WoW client ready! (${installationCheck.platform})`;
-            if (installationCheck.wineInfo?.version) {
-                statusMessage += ` - Wine ${installationCheck.wineInfo.version}`;
-            }
-            updateGameStatus('success', statusMessage);
-            updateMainActionButton('play', 'Launch World of Warcraft', true);
-        } else {
+        // PRIORITY 1: Check if client files are downloaded
+        if (!installationCheck.hasExecutable || !installationCheck.hasData) {
             appState.isWowInstalled = false;
             let message = 'WoW client not found.';
 
@@ -201,19 +190,51 @@ async function checkGameStatus() {
                 message += ' Missing Data folder.';
             }
 
-            // Add platform-specific requirements
-            if (installationCheck.requirements && installationCheck.requirements.length > 0) {
-                message += ` Requirements: ${installationCheck.requirements.join(', ')}`;
-            }
-
             updateGameStatus('error', message);
             
             // Check if we can download
             const canDownload = appState.config.downloadUrl || appState.settings.downloadUrl;
             if (canDownload) {
-                updateMainActionButton('download', 'Download Client', true);
+                updateMainActionButton('download', 'Download Client Files', true);
             } else {
                 updateMainActionButton('configure', 'Configure Download URL', false);
+            }
+            return; // Stop here - download client first
+        }
+        
+        // PRIORITY 2: Client files exist, now check Wine/CrossOver on non-Windows
+        if (appState.platform.needsWine && !appState.wineInfo?.installed) {
+            updateGameStatus('warning', `Client ready. Wine/CrossOver required for ${appState.platform.platformName}`);
+            updateMainActionButton('configure', 'Install Wine/CrossOver', true);
+            return;
+        }
+        
+        // PRIORITY 3: Everything is ready
+        if (installationCheck.isValid) {
+            appState.isWowInstalled = true;
+            let statusMessage = `WoW client ready! (${installationCheck.platform})`;
+            if (installationCheck.wineInfo?.version) {
+                statusMessage += ` - ${installationCheck.wineInfo.type === 'crossover' ? 'CrossOver' : 'Wine'} ${installationCheck.wineInfo.version}`;
+            }
+            updateGameStatus('success', statusMessage);
+            updateMainActionButton('play', 'Launch World of Warcraft', true);
+        } else {
+            appState.isWowInstalled = false;
+            let message = 'Installation incomplete.';
+
+            // Add platform-specific requirements
+            if (installationCheck.requirements && installationCheck.requirements.length > 0) {
+                message += ` ${installationCheck.requirements.join(', ')}`;
+            }
+
+            updateGameStatus('warning', message);
+            
+            // Check if we can download
+            const canDownload = appState.config.downloadUrl || appState.settings.downloadUrl;
+            if (canDownload) {
+                updateMainActionButton('download', 'Re-download Client', true);
+            } else {
+                updateMainActionButton('configure', 'Check Settings', false);
             }
         }
     } catch (error) {
@@ -234,6 +255,10 @@ async function installWineAutomatically() {
         elements.progressText.textContent = 'Preparing Wine installation...';
         elements.progressFill.style.width = '0%';
         elements.progressPercentage.textContent = '0%';
+        
+        // Hide pause/cancel buttons for Wine installation
+        elements.pauseButton.style.display = 'none';
+        elements.cancelButton.style.display = 'none';
 
         const result = await window.electronAPI.installWineAutomatically();
         
@@ -287,6 +312,9 @@ async function handleMainAction() {
             break;
         case 'play':
             await launchWow();
+            break;
+        case 'update':
+            await window.electronAPI.installUpdate();
             break;
         default:
             console.warn('Unknown button state:', buttonState);
@@ -368,18 +396,55 @@ function handleDownloadProgress(event, progress) {
 
     elements.progressPercentage.textContent = `${percentage}%`;
     elements.progressFill.style.width = `${percentage}%`;
-    elements.progressText.textContent = `Downloading... ${downloaded} / ${total} (${speed}/s)`;
+    elements.progressText.textContent = `Downloading Client: ${downloaded} / ${total} (${speed}/s)`;
+    
+    // Show pause/cancel buttons for client downloads
+    elements.pauseButton.style.display = 'inline-block';
+    elements.cancelButton.style.display = 'inline-block';
+}
+
+// Handle extraction progress
+function handleExtractionProgress(event, data) {
+    if (data.status === 'extracting') {
+        elements.progressContainer.style.display = 'block';
+        elements.progressPercentage.textContent = '100%';
+        elements.progressFill.style.width = '100%';
+        elements.progressText.textContent = 'Extracting Client Files...';
+        
+        // Hide pause/cancel buttons during extraction
+        elements.pauseButton.style.display = 'none';
+        elements.cancelButton.style.display = 'none';
+        
+        updateMainActionButton('download', '📦 Extracting...', false);
+    }
 }
 
 // Handle download completion
 function handleDownloadComplete() {
-    showInfo('Download completed successfully!');
+    showInfo('Download completed successfully! Client files installed.');
     resetDownloadUI();
     appState.isDownloading = false;
     appState.downloadPaused = false;
 
     // Recheck installation status
-    setTimeout(() => checkGameStatus(), 1000);
+    setTimeout(async () => {
+        await checkGameStatus();
+        
+        // If on non-Windows platform and Wine/CrossOver not installed, prompt user
+        if (appState.platform.needsWine && !appState.wineInfo?.installed) {
+            const isAppleSilicon = appState.platform.isMacOS && appState.platform.arch === 'arm64';
+            const recommendedTool = appState.platform.isMacOS ? (isAppleSilicon ? 'CrossOver' : 'Wine/CrossOver') : 'Wine';
+            const extraInfo = isAppleSilicon 
+                ? ' CrossOver is highly recommended for Apple Silicon Macs.'
+                : '';
+            
+            showInfo(
+                `✅ Client files ready!\n\n` +
+                `Next Step: Install ${recommendedTool} to run WoW on ${appState.platform.platformName}.${extraInfo}\n\n` +
+                `Click "Install ${recommendedTool}" button or configure manually in Options.`
+            );
+        }
+    }, 1000);
 }
 
 // Handle download errors
@@ -480,6 +545,46 @@ function updateServerStatus(status) {
         status === 'offline' ? 'Server Offline' : 'Checking...';
 }
 
+async function checkServerStatus() {
+    try {
+        const config = await window.electronAPI.getConfig();
+        const realmAddress = config.DEFAULT_REALM || 'wow.ascend-digital.co.uk';
+        
+        updateServerStatus('checking');
+        
+        const result = await window.electronAPI.testRealmConnection(realmAddress);
+        
+        if (result.success) {
+            updateServerStatus('online');
+        } else {
+            updateServerStatus('offline');
+        }
+    } catch (error) {
+        console.error('Error checking server status:', error);
+        updateServerStatus('offline');
+    }
+}
+
+// Poll server status every 30 seconds
+let statusPollInterval;
+function startServerStatusPolling() {
+    // Check immediately
+    checkServerStatus();
+    
+    // Then check every 30 seconds
+    if (statusPollInterval) {
+        clearInterval(statusPollInterval);
+    }
+    statusPollInterval = setInterval(checkServerStatus, 30000);
+}
+
+function stopServerStatusPolling() {
+    if (statusPollInterval) {
+        clearInterval(statusPollInterval);
+        statusPollInterval = null;
+    }
+}
+
 function getStatusIcon(type) {
     switch (type) {
         case 'success': return '✅';
@@ -522,7 +627,11 @@ function formatBytes(bytes, decimals = 2) {
 }
 
 // Initialize the app when the page loads
-document.addEventListener('DOMContentLoaded', initializeApp);
+document.addEventListener('DOMContentLoaded', () => {
+    initializeApp();
+    // Start server status polling
+    startServerStatusPolling();
+});
 
 // Auto-updater event handlers
 window.electronAPI.onUpdateStatus((event, data) => {
@@ -569,18 +678,42 @@ function showUpdateChecking() {
 function hideUpdateNotification() {
     setTimeout(() => {
         elements.updateNotification.style.display = 'none';
+        checkGameStatus(); // Restore normal button state
     }, 2000);
+}
+
+async function downloadLauncherUpdate() {
+    try {
+        elements.updateDownloadBtn.disabled = true;
+        elements.updateDownloadBtn.textContent = 'Starting...';
+        elements.updateDismissBtn.style.display = 'none';
+        await window.electronAPI.downloadUpdate();
+    } catch (error) {
+        console.error('Error downloading update:', error);
+        elements.updateDownloadBtn.disabled = false;
+        elements.updateDownloadBtn.textContent = 'Download Update';
+        elements.updateDismissBtn.style.display = 'block';
+        showError('Failed to download update: ' + error.message);
+        checkGameStatus(); // Restore normal button state
+    }
 }
 
 function showUpdateNotification(version) {
     elements.updateTitle.textContent = `Update Available: v${version}`;
-    elements.updateMessage.textContent = 'A new version of the launcher is available';
+    elements.updateMessage.textContent = 'A new version of the launcher is available. Click Download to update.';
     elements.updateNotification.style.display = 'block';
     elements.updateDownloadBtn.style.display = 'block';
     elements.updateDismissBtn.style.display = 'block';
-    elements.updateDownloadBtn.textContent = 'Download';
+    elements.updateDownloadBtn.textContent = 'Download Update';
     elements.updateDownloadBtn.disabled = false;
     elements.updateIcon.style.animation = 'rotate 2s linear infinite';
+    
+    // Update main button too
+    updateMainActionButton('update', `⬇️ Download Update v${version}`, true);
+    
+    elements.updateDownloadBtn.onclick = async () => {
+        await downloadLauncherUpdate();
+    };
 }
 
 function updateDownloadProgress(data) {
@@ -588,27 +721,42 @@ function updateDownloadProgress(data) {
     const transferred = formatBytes(data.transferred || 0);
     const total = formatBytes(data.total || 0);
     
-    elements.updateTitle.textContent = 'Downloading Update...';
-    elements.updateMessage.textContent = `${percent}% (${transferred} / ${total})`;
+    // Use main progress bar for launcher updates
+    elements.progressContainer.style.display = 'block';
+    elements.progressText.textContent = `Downloading Launcher Update (${transferred} / ${total})`;
+    elements.progressPercentage.textContent = `${percent}%`;
+    elements.progressFill.style.width = `${percent}%`;
+    elements.pauseButton.style.display = 'none'; // Can't pause launcher updates
+    elements.cancelButton.style.display = 'none';
+    updateMainActionButton('download', 'Downloading Update...', false);
+    
+    // Keep update notification visible but minimal
     elements.updateNotification.style.display = 'block';
-    elements.updateDownloadBtn.style.display = 'block';
+    elements.updateTitle.textContent = 'Downloading Update...';
+    elements.updateMessage.textContent = `Version ${data.version || 'latest'}`;
+    elements.updateDownloadBtn.style.display = 'none';
     elements.updateDismissBtn.style.display = 'none';
-    elements.updateDownloadBtn.textContent = `${percent}%`;
-    elements.updateDownloadBtn.disabled = true;
     elements.updateIcon.style.animation = 'rotate 2s linear infinite';
 }
 
 function showUpdateReady(version) {
+    // Hide progress bar
+    elements.progressContainer.style.display = 'none';
+    
+    // Update main action button to install update
+    updateMainActionButton('update', `🎉 Install Update v${version}`, true);
+    
+    // Show notification
     elements.updateTitle.textContent = 'Update Ready! 🎉';
-    elements.updateMessage.textContent = `Version ${version} is ready to install`;
+    elements.updateMessage.textContent = `Version ${version} is ready to install. Click the button below.`;
     elements.updateNotification.style.display = 'block';
-    elements.updateDownloadBtn.style.display = 'block';
+    elements.updateDownloadBtn.style.display = 'none';
     elements.updateDismissBtn.style.display = 'block';
-    elements.updateDownloadBtn.textContent = 'Restart & Install';
-    elements.updateDownloadBtn.disabled = false;
     elements.updateIcon.style.animation = 'none';
-    elements.updateDownloadBtn.onclick = async () => {
-        await window.electronAPI.installUpdate();
+    
+    elements.updateDismissBtn.onclick = () => {
+        elements.updateNotification.style.display = 'none';
+        checkGameStatus(); // Restore normal button state
     };
 }
 

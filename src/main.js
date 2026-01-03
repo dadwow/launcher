@@ -126,7 +126,7 @@ function createWindow() {
             preload: path.join(__dirname, 'preload.js')
         },
         title: `${config.serverName} Launcher`,
-        icon: path.join(__dirname, '../assets/icon.png'), // We'll add this later
+        icon: path.join(__dirname, '../assets/icon.png'),
         show: false, // Don't show until ready
         titleBarStyle: 'default'
     });
@@ -430,6 +430,11 @@ ipcMain.handle('start-download', async (event, url, destination) => {
                         total: downloadState.totalBytes,
                         percent: 100,
                         bytesPerSecond: 0
+                    });
+
+                    // Send extraction progress
+                    mainWindow.webContents.send('extraction-progress', {
+                        status: 'extracting'
                     });
 
                     await extractZipFile(zipPath, destination);
