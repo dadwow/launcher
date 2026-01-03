@@ -218,6 +218,208 @@
             border: 1px solid rgba(255, 193, 7, 0.3);
             color: #ffc107;
         }
+
+        /* Repo validation */
+        .repo-validation {
+            margin-top: 10px;
+            padding: 10px 15px;
+            border-radius: 6px;
+            font-size: 0.9em;
+            display: none;
+        }
+
+        .repo-validation.validating {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 193, 7, 0.1);
+            border: 1px solid rgba(255, 193, 7, 0.3);
+            color: #ffc107;
+        }
+
+        .repo-validation.valid {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(76, 175, 80, 0.1);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            color: #4caf50;
+        }
+
+        .repo-validation.invalid {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(244, 67, 54, 0.1);
+            border: 1px solid rgba(244, 67, 54, 0.3);
+            color: #f44336;
+        }
+
+        .repo-validation .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid currentColor;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Repo info modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: rgba(20, 15, 30, 0.98);
+            border: 2px solid rgba(218, 145, 60, 0.4);
+            border-radius: 12px;
+            max-width: 700px;
+            width: 90%;
+            max-height: 80vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid rgba(218, 145, 60, 0.3);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            color: #f5e6d3;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: #f5e6d3;
+            font-size: 1.5em;
+            cursor: pointer;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+
+        .modal-close:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .modal-body {
+            padding: 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .modal-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid rgba(218, 145, 60, 0.2);
+        }
+
+        .modal-tab {
+            padding: 8px 16px;
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            color: #aaa;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .modal-tab.active {
+            color: #f4a540;
+            border-bottom-color: #f4a540;
+        }
+
+        .modal-tab-content {
+            display: none;
+        }
+
+        .modal-tab-content.active {
+            display: block;
+        }
+
+        .repo-info {
+            margin-bottom: 15px;
+        }
+
+        .repo-info-item {
+            margin-bottom: 10px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 4px;
+        }
+
+        .repo-info-label {
+            font-weight: 600;
+            color: #f4a540;
+            margin-right: 8px;
+        }
+
+        .markdown-content {
+            line-height: 1.6;
+            color: #e0d0c0;
+        }
+
+        .markdown-content h1,
+        .markdown-content h2,
+        .markdown-content h3 {
+            color: #f5e6d3;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+
+        .markdown-content code {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .markdown-content pre {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 12px;
+            border-radius: 6px;
+            overflow-x: auto;
+        }
+
+        .modal-footer {
+            padding: 15px 20px;
+            border-top: 1px solid rgba(218, 145, 60, 0.3);
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
     </style>
 </head>
 
@@ -246,6 +448,10 @@
                     <div class="option-description">
                         Enter a GitHub repository URL to download and install the addon.<br>
                         Examples: https://github.com/ElvUI-WotLK/ElvUI or just "ElvUI-WotLK/ElvUI"
+                    </div>
+                    <div id="repo-validation" class="repo-validation">
+                        <div class="spinner"></div>
+                        <span id="repo-validation-text">Validating repository...</span>
                     </div>
                 </div>
             </div>
@@ -419,6 +625,33 @@
             <div>
                 <button id="reset-options" class="btn btn-danger">Reset to Defaults</button>
                 <button id="save-options" class="btn btn-primary">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Repo Info Modal -->
+    <div id="repo-info-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-repo-title">Repository Information</h3>
+                <button class="modal-close" onclick="closeRepoModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="repo-info" id="modal-repo-info"></div>
+                <div class="modal-tabs">
+                    <button class="modal-tab active" onclick="switchModalTab('readme')">README</button>
+                    <button class="modal-tab" onclick="switchModalTab('releases')">Releases</button>
+                </div>
+                <div id="modal-tab-readme" class="modal-tab-content active">
+                    <div class="markdown-content" id="modal-readme-content">Loading...</div>
+                </div>
+                <div id="modal-tab-releases" class="modal-tab-content">
+                    <div class="markdown-content" id="modal-releases-content">Loading...</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeRepoModal()">Close</button>
+                <button class="btn btn-primary" id="modal-install-btn">Install Addon</button>
             </div>
         </div>
     </div>

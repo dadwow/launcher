@@ -33,6 +33,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     uninstallAddon: (addonName, installPath) => ipcRenderer.invoke('uninstall-addon', addonName, installPath),
     checkAddonUpdates: (addons) => ipcRenderer.invoke('check-addon-updates', addons),
     updateAddon: (githubRepo, installPath) => ipcRenderer.invoke('update-addon', githubRepo, installPath),
+    validateAddonRepo: (owner, repo) => ipcRenderer.invoke('validate-addon-repo', owner, repo),
 
     // Connection testing
     testRealmConnection: (realmAddress) => ipcRenderer.invoke('test-realm-connection', realmAddress),

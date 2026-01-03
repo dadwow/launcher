@@ -508,6 +508,125 @@ ipcMain.handle('cancel-download', async () => {
     return false;
 });
 
+// Validate GitHub repo for WoW addon
+ipcMain.handle('validate-addon-repo', async (event, owner, repo) => {
+    try {
+        // Check if repo exists and get basic info
+        const repoResponse = await axios.get(`https://api.github.com/repos/${owner}/${repo}`, {
+            headers: { 'User-Agent': 'PlusCraft-Launcher' }
+        });
+
+        const repoData = repoResponse.data;
+
+        // Get repo contents to check for .toc files
+        const contentsResponse = await axios.get(`https://api.github.com/repos/${owner}/${repo}/contents`, {
+            headers: { 'User-Agent': 'PlusCraft-Launcher' }
+        });
+
+        const contents = contentsResponse.data;
+        
+        // Check for .toc files in root
+        const hasTocInRoot = contents.some(file => 
+            file.name.endsWith('.toc') && file.type === 'file'
+        );
+
+        let tocFiles = [];
+        let addonFolders = [];
+
+        if (hasTocInRoot) {
+            // Root is the addon
+            tocFiles = contents.filter(file => file.name.endsWith('.toc')).map(f => f.name);
+        } else {
+            // Check subdirectories for .toc files
+            const directories = contents.filter(item => item.type === 'dir');
+            
+            for (const dir of directories.slice(0, 10)) { // Limit to first 10 dirs
+                try {
+                    const dirContentsResponse = await axios.get(dir.url, {
+                        headers: { 'User-Agent': 'PlusCraft-Launcher' }
+                    });
+                    const dirContents = dirContentsResponse.data;
+                    const dirTocFiles = dirContents.filter(file => file.name.endsWith('.toc'));
+                    
+                    if (dirTocFiles.length > 0) {
+                        addonFolders.push({
+                            folder: dir.name,
+                            tocFiles: dirTocFiles.map(f => f.name)
+                        });
+                    }
+                } catch (err) {
+                    console.error(`Error checking directory ${dir.name}:`, err.message);
+                }
+            }
+        }
+
+        // Get README
+        let readme = null;
+        try {
+            const readmeResponse = await axios.get(`https://api.github.com/repos/${owner}/${repo}/readme`, {
+                headers: { 
+                    'User-Agent': 'PlusCraft-Launcher',
+                    'Accept': 'application/vnd.github.v3.raw'
+                }
+            });
+            readme = readmeResponse.data;
+        } catch (err) {
+            console.log('No README found');
+        }
+
+        // Get latest release
+        let latestRelease = null;
+        try {
+            const releaseResponse = await axios.get(`https://api.github.com/repos/${owner}/${repo}/releases/latest`, {
+                headers: { 'User-Agent': 'PlusCraft-Launcher' }
+            });
+            latestRelease = releaseResponse.data;
+        } catch (err) {
+            console.log('No releases found');
+        }
+
+        // Get recent releases
+        let releases = [];
+        try {
+            const releasesResponse = await axios.get(`https://api.github.com/repos/${owner}/${repo}/releases?per_page=5`, {
+                headers: { 'User-Agent': 'PlusCraft-Launcher' }
+            });
+            releases = releasesResponse.data;
+        } catch (err) {
+            console.log('No releases found');
+        }
+
+        const isValid = hasTocInRoot || addonFolders.length > 0;
+
+        return {
+            valid: isValid,
+            repoData: {
+                name: repoData.name,
+                fullName: repoData.full_name,
+                description: repoData.description,
+                stars: repoData.stargazers_count,
+                language: repoData.language,
+                updatedAt: repoData.updated_at,
+                defaultBranch: repoData.default_branch
+            },
+            addonInfo: {
+                hasTocInRoot,
+                tocFiles,
+                addonFolders
+            },
+            readme,
+            latestRelease,
+            releases
+        };
+    } catch (error) {
+        console.error('Error validating addon repo:', error.message);
+        return {
+            valid: false,
+            error: error.response?.status === 404 ? 'Repository not found' : error.message
+        };
+    }
+});
+
 // Realmlist management
 ipcMain.handle('update-realmlist', async (event, installPath, realmAddress) => {
     try {
@@ -656,6 +775,156 @@ ipcMain.handle('install-addon-from-github', async (event, owner, repo, installPa
         const addonPath = path.join(installPath, 'Interface', 'AddOns');
         await fs.ensureDir(addonPath);
 
+        // Check if git is available
+        const hasGit = await checkGitAvailable();
+        
+        if (hasGit) {
+            console.log('Using git clone for addon installation');
+            return await installAddonWithGit(owner, repo, addonPath);
+        } else {
+            console.log('Git not available, falling back to archive download');
+            return await installAddonWithArchive(owner, repo, addonPath);
+        }
+    } catch (error) {
+        console.error('Addon installation error:', error);
+        throw error;
+    }
+});
+
+// Check if git is available on the system
+async function checkGitAvailable() {
+    return new Promise((resolve) => {
+        const gitCheck = spawn('git', ['--version']);
+        gitCheck.on('close', (code) => {
+            resolve(code === 0);
+        });
+        gitCheck.on('error', () => {
+            resolve(false);
+        });
+    });
+}
+
+// Install addon using git clone
+async function installAddonWithGit(owner, repo, addonPath) {
+    const repoUrl = `https://github.com/${owner}/${repo}.git`;
+    const tempClonePath = path.join(addonPath, `temp_${repo}`);
+    
+    // Remove temp directory if it exists
+    if (await fs.pathExists(tempClonePath)) {
+        await fs.remove(tempClonePath);
+    }
+    
+    console.log(`Cloning ${repoUrl} to ${tempClonePath}`);
+    
+    // Clone the repository
+    await new Promise((resolve, reject) => {
+        const gitClone = spawn('git', ['clone', '--depth', '1', repoUrl, tempClonePath]);
+        
+        gitClone.stdout.on('data', (data) => {
+            console.log(`git: ${data}`);
+        });
+        
+        gitClone.stderr.on('data', (data) => {
+            console.log(`git: ${data}`);
+        });
+        
+        gitClone.on('close', (code) => {
+            if (code === 0) {
+                resolve();
+            } else {
+                reject(new Error(`Git clone failed with code ${code}`));
+            }
+        });
+        
+        gitClone.on('error', (error) => {
+            reject(error);
+        });
+    });
+    
+    // Remove .git directory to save space
+    const gitDir = path.join(tempClonePath, '.git');
+    if (await fs.pathExists(gitDir)) {
+        await fs.remove(gitDir);
+    }
+    
+    // Check if the cloned folder contains .toc file(s)
+    const clonedContents = await fs.readdir(tempClonePath);
+    const rootTocFiles = clonedContents.filter(f => f.endsWith('.toc'));
+    
+    if (rootTocFiles.length > 0) {
+        // The repo itself is the addon
+        console.log('Root folder contains .toc files, treating as single addon');
+        const targetPath = path.join(addonPath, repo);
+        
+        if (await fs.pathExists(targetPath)) {
+            await fs.remove(targetPath);
+        }
+        
+        await fs.move(tempClonePath, targetPath);
+        
+        // Store metadata for update tracking
+        const metadataPath = path.join(targetPath, '.github-addon-metadata');
+        await fs.writeJson(metadataPath, {
+            owner,
+            repo,
+            installedAt: new Date().toISOString(),
+            method: 'git'
+        });
+        
+        console.log(`Installed addon: ${repo}`);
+        return { success: true, addons: [repo] };
+    } else {
+        // Check for multiple addon folders in subdirectories
+        const addonFolders = [];
+        for (const item of clonedContents) {
+            const itemPath = path.join(tempClonePath, item);
+            const stat = await fs.stat(itemPath);
+            if (stat.isDirectory() && !item.startsWith('.')) {
+                const subContents = await fs.readdir(itemPath);
+                const tocFiles = subContents.filter(f => f.endsWith('.toc'));
+                if (tocFiles.length > 0) {
+                    addonFolders.push(item);
+                }
+            }
+        }
+        
+        if (addonFolders.length > 0) {
+            // Install each addon folder
+            for (const addonFolder of addonFolders) {
+                const sourcePath = path.join(tempClonePath, addonFolder);
+                const targetPath = path.join(addonPath, addonFolder);
+                
+                if (await fs.pathExists(targetPath)) {
+                    await fs.remove(targetPath);
+                }
+                
+                await fs.move(sourcePath, targetPath);
+                
+                // Store metadata
+                const metadataPath = path.join(targetPath, '.github-addon-metadata');
+                await fs.writeJson(metadataPath, {
+                    owner,
+                    repo,
+                    installedAt: new Date().toISOString(),
+                    method: 'git'
+                });
+                
+                console.log(`Installed addon: ${addonFolder}`);
+            }
+            
+            // Clean up temp directory
+            await fs.remove(tempClonePath);
+            
+            return { success: true, addons: addonFolders };
+        } else {
+            throw new Error('Could not find any .toc files. This does not appear to be a valid WoW addon.');
+        }
+    }
+}
+
+// Install addon using archive download (fallback method)
+async function installAddonWithArchive(owner, repo, addonPath) {
+    try {
         // Get repository information to find the default branch
         let defaultBranch = 'main';
         try {
@@ -728,41 +997,16 @@ ipcMain.handle('install-addon-from-github', async (event, owner, repo, installPa
 
         const sourcePath = path.join(tempExtractPath, mainFolder);
         
-        // Check if there are multiple addon folders inside
+        // Check if there are multiple addon folders inside or if this folder itself is an addon
         const sourceContents = await fs.readdir(sourcePath);
         console.log('Source contents:', sourceContents);
         
-        // If the source contains multiple folders, they might all be addons
-        const addonFolders = [];
-        for (const item of sourceContents) {
-            const itemPath = path.join(sourcePath, item);
-            const stat = await fs.stat(itemPath);
-            if (stat.isDirectory()) {
-                // Check if it looks like an addon folder (has .toc file)
-                const tocFiles = (await fs.readdir(itemPath)).filter(f => f.endsWith('.toc'));
-                if (tocFiles.length > 0) {
-                    addonFolders.push(item);
-                }
-            }
-        }
-
-        if (addonFolders.length > 0) {
-            // Install each addon folder separately
-            for (const addonFolder of addonFolders) {
-                const addonSourcePath = path.join(sourcePath, addonFolder);
-                const addonTargetPath = path.join(addonPath, addonFolder);
-                
-                // Remove existing installation
-                if (await fs.pathExists(addonTargetPath)) {
-                    await fs.remove(addonTargetPath);
-                }
-                
-                // Move addon to final location
-                await fs.move(addonSourcePath, addonTargetPath);
-                console.log(`Installed addon: ${addonFolder}`);
-            }
-        } else {
-            // No .toc files found in subdirectories, treat the whole folder as one addon
+        // First, check if the root folder itself contains a .toc file (repo IS the addon)
+        const rootTocFiles = sourceContents.filter(f => f.endsWith('.toc'));
+        
+        if (rootTocFiles.length > 0) {
+            // The extracted folder itself is the addon
+            console.log('Root folder contains .toc files, treating as single addon');
             const targetPath = path.join(addonPath, repo);
             
             // Remove existing installation
@@ -773,41 +1017,81 @@ ipcMain.handle('install-addon-from-github', async (event, owner, repo, installPa
             // Move addon to final location
             await fs.move(sourcePath, targetPath);
             console.log(`Installed addon: ${repo}`);
+        } else {
+            // Check if there are multiple addon folders inside subdirectories
+            const addonFolders = [];
+            for (const item of sourceContents) {
+                const itemPath = path.join(sourcePath, item);
+                const stat = await fs.stat(itemPath);
+                if (stat.isDirectory()) {
+                    // Check if it looks like an addon folder (has .toc file)
+                    const tocFiles = (await fs.readdir(itemPath)).filter(f => f.endsWith('.toc'));
+                    if (tocFiles.length > 0) {
+                        addonFolders.push(item);
+                    }
+                }
+            }
+
+            if (addonFolders.length > 0) {
+                // Install each addon folder separately
+                for (const addonFolder of addonFolders) {
+                    const addonSourcePath = path.join(sourcePath, addonFolder);
+                    const addonTargetPath = path.join(addonPath, addonFolder);
+                    
+                    // Remove existing installation
+                    if (await fs.pathExists(addonTargetPath)) {
+                        await fs.remove(addonTargetPath);
+                    }
+                    
+                    // Move addon to final location
+                    await fs.move(addonSourcePath, addonTargetPath);
+                    console.log(`Installed addon: ${addonFolder}`);
+                }
+            } else {
+                // No .toc files found anywhere
+                throw new Error('Could not find any .toc files. This does not appear to be a valid WoW addon.');
+            }
         }
 
         // Clean up
         await fs.remove(zipPath);
         await fs.remove(tempExtractPath);
 
+        // Collect installed addon names
+        const installedAddons = addonFolders.length > 0 ? addonFolders : [repo];
+
         // Save GitHub repo info and commit SHA for future updates
-        const commitsUrl = `https://api.github.com/repos/${owner}/${repo}/commits/${branch}`;
+        const commitsUrl = `https://api.github.com/repos/${owner}/${repo}/commits/${branchUsed}`;
         const commitsResponse = await axios.get(commitsUrl, {
             headers: { 'User-Agent': 'WoW-Launcher' }
         });
         const latestCommit = commitsResponse.data.sha;
 
-        for (const addonFolder of addonFolders) {
+        for (const addonFolder of installedAddons) {
             const addonTargetPath = path.join(addonPath, addonFolder);
             const repoFile = path.join(addonTargetPath, '.github-repo');
             await fs.writeFile(repoFile, `${owner}/${repo}`, 'utf8');
+            
             const commitFile = path.join(addonTargetPath, '.github-commit');
             await fs.writeFile(commitFile, latestCommit, 'utf8');
-        }
-        if (addonFolders.length === 0) {
-            const targetPath = path.join(addonPath, repo);
-            const repoFile = path.join(targetPath, '.github-repo');
-            await fs.writeFile(repoFile, `${owner}/${repo}`, 'utf8');
-            const commitFile = path.join(targetPath, '.github-commit');
-            await fs.writeFile(commitFile, latestCommit, 'utf8');
+            
+            // Store metadata
+            const metadataPath = path.join(addonTargetPath, '.github-addon-metadata');
+            await fs.writeJson(metadataPath, {
+                owner,
+                repo,
+                installedAt: new Date().toISOString(),
+                method: 'archive',
+                commit: latestCommit
+            });
         }
 
-        return { success: true, addonsInstalled: addonFolders.length || 1 };
-
+        return { success: true, addons: installedAddons };
     } catch (error) {
-        console.error('Addon installation error:', error);
-        return { success: false, error: error.message };
+        console.error('Archive installation error:', error);
+        throw error;
     }
-});
+}
 
 // Check for addon updates
 ipcMain.handle('check-addon-updates', async (event, addons) => {
