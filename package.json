@@ -79,7 +79,7 @@
         "mac": {
             "category": "public.app-category.games",
             "icon": "assets/icon.png",
-            "artifactName": "macOS/${name}-${arch}.${ext}",
+            "artifactName": "macOS/PlusCraft-Launcher-${arch}.${ext}",
             "target": [
                 {
                     "target": "dmg",
@@ -99,7 +99,7 @@
         },
         "win": {
             "icon": "assets/icon.png",
-            "artifactName": "Windows/${name}-${arch}.${ext}",
+            "artifactName": "Windows/PlusCraft-Launcher-${arch}.${ext}",
             "target": [
                 {
                     "target": "nsis",
@@ -121,10 +121,8 @@
         },
         "nsis": {
             "oneClick": false,
-            "installerLanguages": [
-                "en_US"
-            ],
-            "artifactName": "${productName} Installer.${ext}",
+            "installerLanguages": ["en_US"],
+            "artifactName": "PlusCraft-Launcher-Installer.${ext}",
             "allowToChangeInstallationDirectory": true,
             "createDesktopShortcut": true,
             "createStartMenuShortcut": true,
@@ -133,7 +131,7 @@
         },
         "linux": {
             "icon": "assets/icon.png",
-            "artifactName": "Linux/${name}-${arch}.${ext}",
+            "artifactName": "Linux/PlusCraft-Launcher-${arch}.${ext}",
             "target": [
                 {
                     "target": "AppImage",
