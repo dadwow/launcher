@@ -136,14 +136,14 @@ jobs:
         with:
           name: ${{ matrix.artifact-name }}-build
           path: |
-            dist/*.exe
-            dist/*.dmg
-            dist/*.AppImage
-            dist/*.deb
-            dist/*.rpm
-            dist/*.snap
-            dist/*.tar.gz
-            dist/*.zip
+            dist/**/*.exe
+            dist/**/*.dmg
+            dist/**/*.AppImage
+            dist/**/*.deb
+            dist/**/*.rpm
+            dist/**/*.snap
+            dist/**/*.tar.gz
+            dist/**/*.zip
             dist/*.yml
             dist/*.blockmap
           retention-days: 5
@@ -179,9 +179,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.check-release.outputs.version }}
-          name: WoW Launcher v${{ needs.check-release.outputs.version }}
+          name: PlusCraft Launcher v${{ needs.check-release.outputs.version }}
           body: |
-            ## WoW 3.3.5a Launcher Release v${{ needs.check-release.outputs.version }}
+            ## PlusCraft Launcher Release v${{ needs.check-release.outputs.version }}
 
             ### 🚀 **Cross-Platform WoW Launcher**
             A modern, feature-rich launcher for World of Warcraft 3.3.5a with automatic Wine installation and addon management.
