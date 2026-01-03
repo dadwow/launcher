@@ -449,6 +449,9 @@
 </head>
 
 <body>
+    <!-- Toast Container -->
+    <div class="toast-container" id="toast-container"></div>
+
     <!-- Custom Title Bar -->
     <div class="title-bar">
         <div class="title-bar-title">Settings</div>
@@ -481,7 +484,7 @@
                     <label for="github-repo-url">GitHub Repository URL:</label>
                     <div class="input-group">
                         <input type="text" id="github-repo-url" placeholder="https://github.com/user/addon-name">
-                        <button id="install-addon-btn" class="btn btn-primary">Install</button>
+                        <button id="install-addon-btn" class="btn btn-primary"><span class="btn-text">Install</span></button>
                     </div>
                     <div class="option-description">
                         Enter a GitHub repository URL to download and install the addon.<br>
@@ -497,7 +500,7 @@
             <div class="options-group">
                 <h3>
                     Installed Addons
-                    <button class="btn btn-primary" onclick="checkForUpdates()" style="margin-left: 10px; font-size: 0.9em;">Check for Updates</button>
+                    <button class="btn btn-primary" onclick="checkForUpdates()" style="margin-left: 10px; font-size: 0.9em;"><span class="btn-text">Check for Updates</span></button>
                 </h3>
                 <div id="addon-list">
                     <div class="addon-item">
@@ -540,8 +543,8 @@
                     <div class="input-group">
                         <input type="text" id="install-path-options" readonly
                             placeholder="Select installation directory">
-                        <button id="browse-install-path" class="btn btn-secondary">Browse</button>
-                        <button id="suggest-paths" class="btn btn-secondary">Suggest</button>
+                        <button id="browse-install-path" class="btn btn-secondary"><span class="btn-text">Browse</span></button>
+                        <button id="suggest-paths" class="btn btn-secondary"><span class="btn-text">Suggest</span></button>
                     </div>
                     <div class="option-description">Directory where World of Warcraft is or will be installed</div>
                 </div>
@@ -640,10 +643,10 @@
         </div>
 
         <div class="options-buttons">
-            <button id="cancel-options" class="btn btn-secondary">Cancel</button>
+                <button id="cancel-options" class="btn btn-secondary"><span class="btn-text">Cancel</span></button>
             <div>
-                <button id="reset-options" class="btn btn-danger">Reset to Defaults</button>
-                <button id="save-options" class="btn btn-primary">Save Changes</button>
+                <button id="reset-options" class="btn btn-danger"><span class="btn-text">Reset to Defaults</span></button>
+                <button id="save-options" class="btn btn-primary"><span class="btn-text">Save Changes</span></button>
             </div>
         </div>
     </div>

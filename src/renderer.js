@@ -48,18 +48,11 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     
     const minimizeBtn = document.getElementById('minimize-btn');
-    const maximizeBtn = document.getElementById('maximize-btn');
     const closeBtn = document.getElementById('close-btn');
 
     if (minimizeBtn) {
         minimizeBtn.addEventListener('click', () => {
             window.electronAPI.windowMinimize();
-        });
-    }
-
-    if (maximizeBtn) {
-        maximizeBtn.addEventListener('click', () => {
-            window.electronAPI.windowMaximize();
         });
     }
 
@@ -381,9 +374,23 @@ async function openSettings() {
 
 function closeSettingsModal() {
     if (elements.settingsModal) {
-        elements.settingsModal.style.display = 'none';
-        // Refresh main window data after closing settings
-        checkGameStatus();
+        const backdrop = elements.settingsModal.querySelector('.settings-modal-backdrop');
+        const content = elements.settingsModal.querySelector('.settings-modal-content');
+        
+        // Add closing animation classes
+        if (backdrop) backdrop.classList.add('closing');
+        if (content) content.classList.add('closing');
+        
+        // Hide modal after animation completes (300ms is the longest animation)
+        setTimeout(() => {
+            elements.settingsModal.style.display = 'none';
+            // Remove closing classes for next time
+            if (backdrop) backdrop.classList.remove('closing');
+            if (content) content.classList.remove('closing');
+            
+            // Refresh main window data after closing settings
+            checkGameStatus();
+        }, 300);
     }
 }
 
