@@ -1,7 +1,7 @@
 // Global error handler - catch any errors before initialization
 window.onerror = function(message, source, lineno, colno, error) {
     console.error('Global error caught:', { message, source, lineno, colno, error });
-    alert(`Global Error: ${message}\nAt: ${source}:${lineno}:${colno}\n\nCheck console for details.`);
+    // Don't show alert - errors are logged to console
     return false;
 };
 
@@ -38,7 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
         loadingOverlay: document.getElementById('loading-overlay'),
         loadingText: document.getElementById('loading-text'),
 
-        // Update notification
+        // Update notification (hidden - we use main UI)
         updateNotification: document.getElementById('update-notification'),
         updateTitle: document.getElementById('update-title'),
         updateMessage: document.getElementById('update-message'),
@@ -46,6 +46,11 @@ document.addEventListener('DOMContentLoaded', () => {
         updateDownloadBtn: document.getElementById('update-download-btn'),
         updateDismissBtn: document.getElementById('update-dismiss-btn')
     };
+    
+    // Hide update notification modal - we use main progress bar and button
+    if (elements.updateNotification) {
+        elements.updateNotification.style.display = 'none';
+    }
     
     const minimizeBtn = document.getElementById('minimize-btn');
     const closeBtn = document.getElementById('close-btn');
@@ -284,7 +289,7 @@ Stack trace:
 ${error.stack || 'No stack trace available'}`;
         
         console.log('Full error details:', errorDetails);
-        alert(errorDetails);
+        // Error logged to console for debugging
     }
 }
 
@@ -398,6 +403,11 @@ function closeSettingsModal() {
             // Remove closing classes for next time
             if (backdrop) backdrop.classList.remove('closing');
             if (content) content.classList.remove('closing');
+            
+            // Clear iframe to prevent any interference with main window
+            if (elements.settingsIframe) {
+                elements.settingsIframe.src = 'about:blank';
+            }
             
             // Refresh main window data after closing settings
             checkGameStatus();
@@ -994,10 +1004,9 @@ function showUpdateChecking() {
 }
 
 function hideUpdateNotification() {
-    setTimeout(() => {
-        elements.updateNotification.style.display = 'none';
-        checkGameStatus(); // Restore normal button state
-    }, 2000);
+    // Don't show notification modal - updates handled through main UI
+    console.log('Update notification hidden');
+    checkGameStatus(); // Restore normal button state
 }
 
 async function downloadLauncherUpdate() {
@@ -1017,21 +1026,10 @@ async function downloadLauncherUpdate() {
 }
 
 function showUpdateNotification(version) {
-    elements.updateTitle.textContent = `Update Available: v${version}`;
-    elements.updateMessage.textContent = 'A new version of the launcher is available. Click Download to update.';
-    elements.updateNotification.style.display = 'block';
-    elements.updateDownloadBtn.style.display = 'block';
-    elements.updateDismissBtn.style.display = 'block';
-    elements.updateDownloadBtn.textContent = 'Download Update';
-    elements.updateDownloadBtn.disabled = false;
-    elements.updateIcon.style.animation = 'rotate 2s linear infinite';
-    
-    // Update main button too
+    // Don't show modal - use main button and status instead
+    console.log(`Update available: v${version}`);
+    updateGameStatus('warning', `🔄 Launcher update available: v${version}`);
     updateMainActionButton('update', `⬇️ Download Update v${version}`, true);
-    
-    elements.updateDownloadBtn.onclick = async () => {
-        await downloadLauncherUpdate();
-    };
 }
 
 function updateDownloadProgress(data) {
@@ -1047,14 +1045,7 @@ function updateDownloadProgress(data) {
     elements.pauseButton.style.display = 'none'; // Can't pause launcher updates
     elements.cancelButton.style.display = 'none';
     updateMainActionButton('download', 'Downloading Update...', false);
-    
-    // Keep update notification visible but minimal
-    elements.updateNotification.style.display = 'block';
-    elements.updateTitle.textContent = 'Downloading Update...';
-    elements.updateMessage.textContent = `Version ${data.version || 'latest'}`;
-    elements.updateDownloadBtn.style.display = 'none';
-    elements.updateDismissBtn.style.display = 'none';
-    elements.updateIcon.style.animation = 'rotate 2s linear infinite';
+    updateGameStatus('warning', `Downloading update: ${percent}%`);
 }
 
 function showUpdateReady(version) {
@@ -1062,20 +1053,8 @@ function showUpdateReady(version) {
     elements.progressContainer.style.display = 'none';
     
     // Update main action button to install update
+    updateGameStatus('success', `✅ Update v${version} ready to install!`);
     updateMainActionButton('update', `🎉 Install Update v${version}`, true);
-    
-    // Show notification
-    elements.updateTitle.textContent = 'Update Ready! 🎉';
-    elements.updateMessage.textContent = `Version ${version} is ready to install. Click the button below.`;
-    elements.updateNotification.style.display = 'block';
-    elements.updateDownloadBtn.style.display = 'none';
-    elements.updateDismissBtn.style.display = 'block';
-    elements.updateIcon.style.animation = 'none';
-    
-    elements.updateDismissBtn.onclick = () => {
-        elements.updateNotification.style.display = 'none';
-        checkGameStatus(); // Restore normal button state
-    };
 }
 
 // Clean up event listeners when the page unloads

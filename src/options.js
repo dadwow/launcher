@@ -293,7 +293,10 @@ async function browseForInstallPath() {
 
 // Check WoW installation
 async function checkInstallation() {
+    setButtonLoading('check-installation', true);
+    
     if (!optionsState.installPath) {
+        setButtonLoading('check-installation', false);
         updateInstallationStatus('warning', 'Please select an installation directory.');
         return;
     }
@@ -309,14 +312,19 @@ async function checkInstallation() {
     } catch (error) {
         console.error('Error checking installation:', error);
         updateInstallationStatus('error', 'Error checking installation.');
+    } finally {
+        setButtonLoading('check-installation', false);
     }
 }
 
 // Test realm connection
 async function testRealmConnection() {
+    setButtonLoading('test-connection', true);
+    
     const realmAddress = optionsState.realmAddress || optionsState.config?.defaultRealm;
     
     if (!realmAddress) {
+        setButtonLoading('test-connection', false);
         updateConnectionStatus('error', 'Please enter a realm address');
         return;
     }
@@ -334,6 +342,9 @@ async function testRealmConnection() {
     } catch (error) {
         console.error('Error testing connection:', error);
         updateConnectionStatus('error', 'Error testing connection');
+    } finally {
+        const testBtn = document.getElementById('test-connection');
+        if (testBtn) setButtonLoading('test-connection', false);
     }
 }
 
@@ -389,6 +400,8 @@ async function installAddonFromGitHub() {
 // Save options
 async function saveOptions() {
     try {
+        setButtonLoading('save-options', true);
+        
         const settings = {
             installPath: elements.installPathInput?.value || optionsState.installPath,
             realmAddress: elements.realmAddressInput?.value || optionsState.realmAddress,
@@ -400,20 +413,21 @@ async function saveOptions() {
         };
 
         await proxyElectronAPICall('saveSettings', settings);
-        showInfo('Settings saved successfully!');
+        
+        setButtonFeedback('save-options', 'Saved!', 'success', 1500);
 
-        // Close modal after a short delay
+        // Close modal after feedback
         setTimeout(() => {
             if (window.parent !== window) {
                 window.parent.postMessage({ type: 'closeSettingsModal' }, '*');
             } else {
                 window.close();
             }
-        }, 1000);
+        }, 1500);
 
     } catch (error) {
         console.error('Error saving settings:', error);
-        showError('Failed to save settings');
+        setButtonFeedback('save-options', 'Save Failed', 'error', 2000);
     }
 }
 
