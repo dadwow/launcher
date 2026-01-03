@@ -1,6 +1,6 @@
 {
     "name": "wow-launcher",
-    "version": "1.0.13",
+    "version": "1.0.14",
     "description": "WoW 3.3.5a Client Launcher built with Electron",
     "main": "src/main.js",
     "scripts": {
@@ -121,7 +121,9 @@
         },
         "nsis": {
             "oneClick": false,
-            "installerLanguages": ["en_US"],
+            "installerLanguages": [
+                "en_US"
+            ],
             "artifactName": "PlusCraft-Launcher-Installer.${ext}",
             "allowToChangeInstallationDirectory": true,
             "createDesktopShortcut": true,
