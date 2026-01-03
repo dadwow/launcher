@@ -79,7 +79,7 @@
         "mac": {
             "category": "public.app-category.games",
             "icon": "assets/icon.png",
-            "artifactName": "macOS/${productName}-${version}-${arch}.${ext}",
+            "artifactName": "macOS/${name}-${arch}.${ext}",
             "target": [
                 {
                     "target": "dmg",
@@ -99,7 +99,7 @@
         },
         "win": {
             "icon": "assets/icon.png",
-            "artifactName": "Windows/${productName}-${version}-${arch}.${ext}",
+            "artifactName": "Windows/${name}-${arch}.${ext}",
             "target": [
                 {
                     "target": "nsis",
@@ -121,6 +121,8 @@
         },
         "nsis": {
             "oneClick": false,
+            "installerLanguages": ["en_US"],
+            "artifactName": "${productName} Installer.${ext}",
             "allowToChangeInstallationDirectory": true,
             "createDesktopShortcut": true,
             "createStartMenuShortcut": true,
@@ -129,7 +131,7 @@
         },
         "linux": {
             "icon": "assets/icon.png",
-            "artifactName": "Linux/${productName}-${version}-${arch}.${ext}",
+            "artifactName": "Linux/${name}-${arch}.${ext}",
             "target": [
                 {
                     "target": "AppImage",
