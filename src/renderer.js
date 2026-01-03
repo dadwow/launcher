@@ -7,6 +7,179 @@ window.onerror = function(message, source, lineno, colno, error) {
 
 console.log('Renderer.js loaded');
 
+// Setup window controls for frameless window
+document.addEventListener('DOMContentLoaded', () => {
+    // Initialize DOM elements now that DOM is ready
+    elements = {
+        serverName: document.getElementById('server-name'),
+        statusDot: document.getElementById('status-dot'),
+        statusText: document.getElementById('status-text'),
+        gameStatus: document.getElementById('game-status'),
+        settingsButton: document.getElementById('settings-button'),
+        settingsModal: document.getElementById('settings-modal'),
+        settingsIframe: document.getElementById('settings-iframe'),
+
+        // Progress elements
+        progressContainer: document.getElementById('progress-container'),
+        progressText: document.getElementById('progress-text'),
+        progressPercentage: document.getElementById('progress-percentage'),
+        progressFill: document.getElementById('progress-fill'),
+        pauseButton: document.getElementById('pause-button'),
+        cancelButton: document.getElementById('cancel-button'),
+
+        // Main action button
+        mainActionButton: document.getElementById('main-action-button'),
+        actionIcon: document.getElementById('action-icon'),
+        actionText: document.getElementById('action-text'),
+
+        // Footer
+        aboutLink: document.getElementById('about-link'),
+        launcherVersion: document.getElementById('launcher-version'),
+        loadingOverlay: document.getElementById('loading-overlay'),
+        loadingText: document.getElementById('loading-text'),
+
+        // Update notification
+        updateNotification: document.getElementById('update-notification'),
+        updateTitle: document.getElementById('update-title'),
+        updateMessage: document.getElementById('update-message'),
+        updateIcon: document.querySelector('.update-icon'),
+        updateDownloadBtn: document.getElementById('update-download-btn'),
+        updateDismissBtn: document.getElementById('update-dismiss-btn')
+    };
+    
+    const minimizeBtn = document.getElementById('minimize-btn');
+    const maximizeBtn = document.getElementById('maximize-btn');
+    const closeBtn = document.getElementById('close-btn');
+
+    if (minimizeBtn) {
+        minimizeBtn.addEventListener('click', () => {
+            window.electronAPI.windowMinimize();
+        });
+    }
+
+    if (maximizeBtn) {
+        maximizeBtn.addEventListener('click', () => {
+            window.electronAPI.windowMaximize();
+        });
+    }
+
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => {
+            window.electronAPI.windowClose();
+        });
+    }
+    
+    // Listen for messages from settings iframe
+    window.addEventListener('message', (event) => {
+        if (event.data && event.data.type === 'closeSettingsModal') {
+            closeSettingsModal();
+        }
+    });
+
+    // Handle electronAPI requests from iframe (settings modal)
+    window.addEventListener('message', async (event) => {
+        if (event.data.type === 'electronAPI-request') {
+            try {
+                const { requestId, method, args } = event.data;
+                const result = await window.electronAPI[method](...args);
+                
+                // Send response back to iframe
+                event.source.postMessage({
+                    type: 'electronAPI-response',
+                    requestId: requestId,
+                    result: result
+                }, '*');
+            } catch (error) {
+                // Send error back to iframe
+                event.source.postMessage({
+                    type: 'electronAPI-response',
+                    requestId: event.data.requestId,
+                    error: error.message || error.toString()
+                }, '*');
+            }
+        }
+        
+        // Handle new proxy electronAPI calls
+        if (event.data.type === 'electronAPICall') {
+            try {
+                const { id, method, args } = event.data;
+                const result = await window.electronAPI[method](...args);
+                
+                // Send response back to iframe
+                event.source.postMessage({
+                    type: 'electronAPIResponse',
+                    id: id,
+                    result: result
+                }, '*');
+            } catch (error) {
+                // Send error back to iframe
+                event.source.postMessage({
+                    type: 'electronAPIResponse',
+                    id: event.data.id,
+                    error: error.message || error.toString()
+                }, '*');
+            }
+        }
+    });
+    
+    // Close modal with Escape key
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && elements.settingsModal && elements.settingsModal.style.display === 'flex') {
+            closeSettingsModal();
+        }
+    });
+    
+    // Setup modal backdrop click handler after DOM is loaded
+    const settingsModal = document.getElementById('settings-modal');
+    if (settingsModal) {
+        const backdrop = settingsModal.querySelector('.settings-modal-backdrop');
+        if (backdrop) {
+            backdrop.addEventListener('click', closeSettingsModal);
+        }
+    }
+    
+    // Setup update notification button handlers
+    if (elements.updateDownloadBtn) {
+        elements.updateDownloadBtn.addEventListener('click', async () => {
+            if (elements.updateDownloadBtn.textContent === 'Download') {
+                try {
+                    elements.updateDownloadBtn.disabled = true;
+                    elements.updateDownloadBtn.textContent = 'Starting...';
+                    await window.electronAPI.downloadUpdate();
+                } catch (error) {
+                    console.error('Error downloading update:', error);
+                    elements.updateDownloadBtn.disabled = false;
+                    elements.updateDownloadBtn.textContent = 'Download';
+                    showError('Failed to download update: ' + error.message);
+                }
+            }
+        });
+    }
+    
+    if (elements.updateDismissBtn) {
+        elements.updateDismissBtn.addEventListener('click', () => {
+            elements.updateNotification.style.display = 'none';
+        });
+    }
+    
+    // Add iframe error handling to prevent load errors
+    if (elements.settingsIframe) {
+        elements.settingsIframe.addEventListener('error', (e) => {
+            console.warn('Settings iframe error (expected during initialization):', e);
+        });
+        
+        elements.settingsIframe.addEventListener('load', () => {
+            console.log('Settings iframe loaded successfully');
+        });
+        
+        // Prevent initial src loading which might cause errors
+        elements.settingsIframe.src = 'about:blank';
+    }
+    
+    // Initialize the app after DOM and elements are ready
+    initializeApp();
+});
+
 // Main application state
 let appState = {
     config: null,
@@ -22,41 +195,8 @@ let appState = {
 
 console.log('App state initialized');
 
-// DOM elements
-const elements = {
-    serverName: document.getElementById('server-name'),
-    statusDot: document.getElementById('status-dot'),
-    statusText: document.getElementById('status-text'),
-    gameStatus: document.getElementById('game-status'),
-    optionsButton: document.getElementById('options-button'),
-
-    // Progress elements
-    progressContainer: document.getElementById('progress-container'),
-    progressText: document.getElementById('progress-text'),
-    progressPercentage: document.getElementById('progress-percentage'),
-    progressFill: document.getElementById('progress-fill'),
-    pauseButton: document.getElementById('pause-button'),
-    cancelButton: document.getElementById('cancel-button'),
-
-    // Main action button
-    mainActionButton: document.getElementById('main-action-button'),
-    actionIcon: document.getElementById('action-icon'),
-    actionText: document.getElementById('action-text'),
-
-    // Footer
-    aboutLink: document.getElementById('about-link'),
-    launcherVersion: document.getElementById('launcher-version'),
-    loadingOverlay: document.getElementById('loading-overlay'),
-    loadingText: document.getElementById('loading-text'),
-
-    // Update notification
-    updateNotification: document.getElementById('update-notification'),
-    updateTitle: document.getElementById('update-title'),
-    updateMessage: document.getElementById('update-message'),
-    updateIcon: document.querySelector('.update-icon'),
-    updateDownloadBtn: document.getElementById('update-download-btn'),
-    updateDismissBtn: document.getElementById('update-dismiss-btn')
-};
+// DOM elements - will be initialized when DOM is ready
+let elements = {};
 
 // Initialize the application
 async function initializeApp() {
@@ -157,8 +297,8 @@ function handleWineInstallProgress(event, data) {
 
 // Set up all event listeners
 function setupEventListeners() {
-    // Options button
-    elements.optionsButton.addEventListener('click', openOptions);
+    // Settings button
+    elements.settingsButton.addEventListener('click', openSettings);
 
     // Main action button (handles download/launch based on state)
     elements.mainActionButton.addEventListener('click', handleMainAction);
@@ -197,13 +337,53 @@ function setupEventListeners() {
     });
 }
 
-// Open options window
-async function openOptions() {
+// Open settings window
+async function openSettings() {
     try {
-        await window.electronAPI.openOptionsWindow();
+        // Show the modal
+        if (elements.settingsModal) {
+            elements.settingsModal.style.display = 'flex';
+            
+            // Load iframe content only when opening
+            if (elements.settingsIframe) {
+                elements.settingsIframe.src = 'options.html';
+                
+                // Wait for iframe to load, then pass data to it
+                elements.settingsIframe.onload = async () => {
+                    try {
+                        console.log('Iframe loaded, sending data...');
+                        // Get all the data the iframe needs
+                        const config = await window.electronAPI.getConfig();
+                        const settings = await window.electronAPI.loadSettings();
+                        
+                        console.log('Sending config to iframe:', config);
+                        console.log('Sending settings to iframe:', settings);
+                        
+                        // Send data to the iframe
+                        elements.settingsIframe.contentWindow.postMessage({
+                            type: 'initializeWithData',
+                            config: config,
+                            settings: settings
+                        }, '*');
+                    } catch (error) {
+                        console.warn('Failed to load settings data:', error);
+                    }
+                };
+            }
+        } else {
+            console.warn('Settings modal element not found');
+        }
     } catch (error) {
-        console.error('Failed to open options window:', error);
-        showError('Failed to open options window.');
+        // Silently handle errors during settings opening
+        console.warn('Settings modal issue:', error.message || error);
+    }
+}
+
+function closeSettingsModal() {
+    if (elements.settingsModal) {
+        elements.settingsModal.style.display = 'none';
+        // Refresh main window data after closing settings
+        checkGameStatus();
     }
 }
 
@@ -345,7 +525,12 @@ async function handleMainAction() {
     
     switch (buttonState) {
         case 'configure':
-            await openOptions();
+            // Only open settings if DOM elements are ready
+            if (document.readyState === 'complete' && elements.settingsModal) {
+                await openSettings();
+            } else {
+                console.warn('Tried to open settings before DOM ready or modal not found');
+            }
             break;
         case 'download':
             await startDownload();
@@ -358,14 +543,6 @@ async function handleMainAction() {
             break;
         default:
             console.warn('Unknown button state:', buttonState);
-    }
-}// Open options window
-async function openOptions() {
-    try {
-        await window.electronAPI.openOptionsWindow();
-    } catch (error) {
-        console.error('Failed to open options:', error);
-        updateGameStatus('error', 'Failed to open options window');
     }
 }
 
@@ -579,29 +756,41 @@ function updateMainActionButton(state, text, enabled) {
     }
 }
 
-function updateServerStatus(status) {
+function updateServerStatus(status, data = {}) {
     elements.statusDot.className = `status-dot ${status}`;
     elements.statusText.textContent = status === 'online' ? 'Server Online' :
         status === 'offline' ? 'Server Offline' : 'Checking...';
+    
+    // Update tooltip with additional information
+    const statusContainer = document.getElementById('server-status');
+    if (statusContainer) {
+        if (status === 'online' && data.ping) {
+            statusContainer.title = `Server Online\nPing: ${data.ping}ms\nLast checked: ${new Date().toLocaleTimeString()}`;
+        } else if (status === 'offline') {
+            statusContainer.title = `Server Offline\n${data.error || 'Unable to connect'}\nLast checked: ${new Date().toLocaleTimeString()}`;
+        } else {
+            statusContainer.title = 'Checking server status...';
+        }
+    }
 }
 
 async function checkServerStatus() {
     try {
         const config = await window.electronAPI.getConfig();
-        const realmAddress = config.DEFAULT_REALM || 'wow.ascend-digital.co.uk';
+        const realmAddress = config.defaultRealm || 'play.ascend-digital.co.uk';
         
         updateServerStatus('checking');
         
         const result = await window.electronAPI.testRealmConnection(realmAddress);
         
         if (result.success) {
-            updateServerStatus('online');
+            updateServerStatus('online', { ping: result.ping });
         } else {
-            updateServerStatus('offline');
+            updateServerStatus('offline', { error: result.error });
         }
     } catch (error) {
         console.error('Error checking server status:', error);
-        updateServerStatus('offline');
+        updateServerStatus('offline', { error: error.message });
     }
 }
 
@@ -799,26 +988,6 @@ function showUpdateReady(version) {
         checkGameStatus(); // Restore normal button state
     };
 }
-
-// Update notification button handlers
-elements.updateDownloadBtn.addEventListener('click', async () => {
-    if (elements.updateDownloadBtn.textContent === 'Download') {
-        try {
-            elements.updateDownloadBtn.disabled = true;
-            elements.updateDownloadBtn.textContent = 'Starting...';
-            await window.electronAPI.downloadUpdate();
-        } catch (error) {
-            console.error('Error downloading update:', error);
-            elements.updateDownloadBtn.disabled = false;
-            elements.updateDownloadBtn.textContent = 'Download';
-            showError('Failed to download update: ' + error.message);
-        }
-    }
-});
-
-elements.updateDismissBtn.addEventListener('click', () => {
-    elements.updateNotification.style.display = 'none';
-});
 
 // Clean up event listeners when the page unloads
 window.addEventListener('beforeunload', () => {

@@ -51,7 +51,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     checkWineInstalling: () => ipcRenderer.invoke('check-wine-installing'),
 
     // Window management
-    openOptionsWindow: () => ipcRenderer.invoke('open-options-window'),
+    windowMinimize: () => ipcRenderer.invoke('window-minimize'),
+    windowMaximize: () => ipcRenderer.invoke('window-maximize'),
+    windowClose: () => ipcRenderer.invoke('window-close'),
 
     // Auto-updater
     checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
