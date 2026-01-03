@@ -14,7 +14,8 @@ const PlatformManager = require('./platform-manager');
 
 // Configure autoUpdater to allow unsigned builds
 autoUpdater.autoDownload = false;
-autoUpdater.autoInstallOnAppQuit = false;
+autoUpdater.autoInstallOnAppQuit = true;
+autoUpdater.logger = console;
 
 // Disable signature verification for Windows
 if (process.platform === 'win32') {
@@ -31,12 +32,19 @@ const envPaths = [
     path.join(app.getAppPath(), '.env')              // Production: app/.env
 ];
 
+let envLoaded = false;
 for (const envPath of envPaths) {
     if (fs.existsSync(envPath)) {
         console.log(`Loading .env from: ${envPath}`);
         dotenv.config({ path: envPath });
+        envLoaded = true;
         break;
     }
+}
+
+if (!envLoaded) {
+    console.warn('Warning: .env file not found in any expected location. Using defaults.');
+    console.log('Searched paths:', envPaths);
 }
 
 // Keep a global reference of the window object
@@ -65,16 +73,13 @@ const config = {
     installPath: process.env.WOW_INSTALL_PATH || path.join(os.homedir(), 'Documents', 'World of Warcraft')
 };
 
-// Configure auto-updater
-autoUpdater.autoDownload = false;
-autoUpdater.autoInstallOnAppQuit = true;
-autoUpdater.logger = console;
-
-// Disable signature verification for unsigned builds on all platforms
-// Remove these if you sign your releases with a code signing certificate
-if (process.platform === 'win32') {
-    autoUpdater.forceDevUpdateConfig = true; // Allow unsigned updates
-}
+console.log('Launcher configuration:', {
+    serverName: config.serverName,
+    defaultRealm: config.defaultRealm,
+    hasDownloadUrl: !!config.downloadUrl,
+    installPath: config.installPath,
+    platform: process.platform
+});
 
 // Auto-updater event handlers
 autoUpdater.on('checking-for-update', () => {
@@ -133,6 +138,8 @@ autoUpdater.on('update-downloaded', (info) => {
 });
 
 function createWindow() {
+    console.log('Creating main window...');
+    
     // Create the browser window
     mainWindow = new BrowserWindow({
         width: config.width,
@@ -151,21 +158,40 @@ function createWindow() {
         titleBarStyle: 'default'
     });
 
+    console.log('Window created, loading index.html...');
+
     // Load the app
-    mainWindow.loadFile(path.join(__dirname, 'index.html'));
+    mainWindow.loadFile(path.join(__dirname, 'index.html')).then(() => {
+        console.log('index.html loaded successfully');
+    }).catch(err => {
+        console.error('Failed to load index.html:', err);
+    });
 
     // Show window when ready to prevent visual flash
     mainWindow.once('ready-to-show', () => {
+        console.log('Window ready to show');
         mainWindow.show();
 
         // Open DevTools in development mode
         if (config.devMode) {
+            console.log('Opening DevTools (dev mode)');
             mainWindow.webContents.openDevTools();
         }
+    });
+    
+    // Log console messages from renderer
+    mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+        console.log(`[Renderer ${level}] ${message} (${sourceId}:${line})`);
+    });
+    
+    // Log any errors in the renderer
+    mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+        console.error('Page failed to load:', errorCode, errorDescription);
     });
 
     // Handle window closed
     mainWindow.on('closed', () => {
+        console.log('Main window closed');
         mainWindow = null;
     });
 
@@ -284,21 +310,32 @@ function createMenu() {
 
 // App event handlers
 app.whenReady().then(() => {
-    // Initialize platform manager
-    platformManager = new PlatformManager();
+    try {
+        // Initialize platform manager
+        console.log('Initializing platform manager...');
+        platformManager = new PlatformManager();
+        console.log('Platform manager initialized');
 
-    createWindow();
-    createMenu();
+        createWindow();
+        createMenu();
 
-    // Check for updates after a short delay (2 seconds) to let the app fully load
-    setTimeout(() => {
-        if (!config.devMode) {
-            console.log('Checking for updates...');
-            autoUpdater.checkForUpdates();
-        } else {
-            console.log('Skipping update check in dev mode');
-        }
-    }, 2000);
+        // Check for updates after a short delay (2 seconds) to let the app fully load
+        setTimeout(() => {
+            if (!config.devMode) {
+                console.log('Checking for updates...');
+                autoUpdater.checkForUpdates().catch(err => {
+                    console.error('Auto-updater check failed:', err);
+                });
+            } else {
+                console.log('Skipping update check in dev mode');
+            }
+        }, 2000);
+    } catch (error) {
+        console.error('Failed to initialize application:', error);
+        dialog.showErrorBox('Initialization Error', 
+            `Failed to start the launcher.\n\nError: ${error.message}\n\nPlease check the console logs for details.`);
+        app.quit();
+    }
 
     app.on('activate', () => {
         // On macOS, re-create window when dock icon is clicked
@@ -306,6 +343,9 @@ app.whenReady().then(() => {
             createWindow();
         }
     });
+}).catch(error => {
+    console.error('App failed to initialize:', error);
+    app.quit();
 });
 
 app.on('window-all-closed', () => {
@@ -317,14 +357,26 @@ app.on('window-all-closed', () => {
 
 // IPC handlers
 ipcMain.handle('get-config', () => {
-    return {
-        serverName: config.serverName,
-        defaultRealm: config.defaultRealm,
-        installPath: config.installPath,
-        downloadUrl: config.downloadUrl,
-        platform: platformManager.getPlatformInfo(),
-        version: app.getVersion()
-    };
+    try {
+        if (!platformManager) {
+            throw new Error('Platform manager not initialized');
+        }
+        
+        const configData = {
+            serverName: config.serverName,
+            defaultRealm: config.defaultRealm,
+            installPath: config.installPath,
+            downloadUrl: config.downloadUrl,
+            platform: platformManager.getPlatformInfo(),
+            version: app.getVersion()
+        };
+        
+        console.log('Returning config to renderer:', configData);
+        return configData;
+    } catch (error) {
+        console.error('Error in get-config handler:', error);
+        throw error;
+    }
 });
 
 // Auto-updater IPC handlers
