@@ -228,13 +228,87 @@
         </div>
 
         <div class="options-tabs">
-            <button class="tab-button active" data-tab="general">General</button>
+            <button class="tab-button active" data-tab="addons">Addons</button>
             <button class="tab-button" data-tab="server">Server</button>
-            <button class="tab-button" data-tab="addons">Addons</button>
+            <button class="tab-button" data-tab="advanced">Advanced</button>
         </div>
 
-        <!-- General Tab -->
-        <div id="general-tab" class="tab-content active">
+        <!-- Addons Tab -->
+        <div id="addons-tab" class="tab-content active">
+            <div class="options-group">
+                <h3>Install Addon from GitHub</h3>
+                <div class="option-item">
+                    <label for="github-repo-url">GitHub Repository URL:</label>
+                    <div class="input-group">
+                        <input type="text" id="github-repo-url" placeholder="https://github.com/user/addon-name">
+                        <button id="install-addon-btn" class="btn btn-primary">Install</button>
+                    </div>
+                    <div class="option-description">
+                        Enter a GitHub repository URL to download and install the addon.<br>
+                        Examples: https://github.com/ElvUI-WotLK/ElvUI or just "ElvUI-WotLK/ElvUI"
+                    </div>
+                </div>
+            </div>
+
+            <div class="options-group">
+                <h3>
+                    Installed Addons
+                    <button class="btn btn-primary" onclick="checkForUpdates()" style="margin-left: 10px; font-size: 0.9em;">Check for Updates</button>
+                </h3>
+                <div id="addon-list">
+                    <div class="addon-item">
+                        <div class="addon-info">
+                            <div class="addon-name">No addons installed</div>
+                            <div class="addon-description">Install addons from GitHub repositories above</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="options-group">
+                <h3>Addon Settings</h3>
+                <div class="option-item">
+                    <label for="auto-update-addons">Auto-update addons on launch:</label>
+                    <select id="auto-update-addons">
+                        <option value="false">No</option>
+                        <option value="true">Yes</option>
+                    </select>
+                    <div class="option-description">Automatically check for addon updates when launching the game</div>
+                </div>
+
+                <div class="option-item">
+                    <label for="addon-backup">Backup existing addons before update:</label>
+                    <select id="addon-backup">
+                        <option value="true">Yes</option>
+                        <option value="false">No</option>
+                    </select>
+                    <div class="option-description">Create backups of existing addons before installing updates</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Server Tab -->
+        <div id="server-tab" class="tab-content">
+            <div class="options-group">
+                <h3>Server Configuration</h3>
+                <div class="option-item">
+                    <label for="realm-address-options">Realm Address:</label>
+                    <input type="text" id="realm-address-options" placeholder="logon.server.com">
+                    <div class="option-description">Server address that will be written to realmlist.wtf</div>
+                </div>
+
+                <div class="option-item">
+                    <button id="test-realm-connection" class="btn btn-secondary">Test Connection</button>
+                    <div id="realm-connection-status" class="connection-status" style="display: none;">
+                        <span class="status-icon">ℹ️</span>
+                        <span class="status-text">Testing connection...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Advanced Tab -->
+        <div id="advanced-tab" class="tab-content">
             <div class="options-group">
                 <h3>Installation Settings</h3>
                 <div class="option-item">
@@ -311,6 +385,12 @@
                     </select>
                     <div class="option-description">Whether to close the launcher when WoW starts</div>
                 </div>
+
+                <div class="option-item">
+                    <label for="download-url-options">Client Download URL:</label>
+                    <input type="url" id="download-url-options" placeholder="https://example.com/wow-client.zip">
+                    <div class="option-description">URL to download the complete WoW client (ZIP format)</div>
+                </div>
             </div>
         </div>
 
@@ -330,72 +410,6 @@
                         <span class="status-icon">ℹ️</span>
                         <span class="status-text">Testing connection...</span>
                     </div>
-                </div>
-
-                <div class="option-item">
-                    <label for="server-name-options">Server Name:</label>
-                    <input type="text" id="server-name-options" placeholder="Your WoW Server">
-                    <div class="option-description">Display name shown in the launcher title</div>
-                </div>
-
-                <div class="option-item">
-                    <label for="download-url-options">Client Download URL:</label>
-                    <input type="url" id="download-url-options" placeholder="https://example.com/wow-client.zip">
-                    <div class="option-description">URL to download the complete WoW client (ZIP format)</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Addons Tab -->
-        <div id="addons-tab" class="tab-content">
-            <div class="options-group">
-                <h3>Install Addon from GitHub</h3>
-                <div class="option-item">
-                    <label for="github-repo-url">GitHub Repository URL:</label>
-                    <div class="input-group">
-                        <input type="text" id="github-repo-url" placeholder="https://github.com/user/addon-name">
-                        <button id="install-addon-btn" class="btn btn-primary">Install</button>
-                    </div>
-                    <div class="option-description">
-                        Enter a GitHub repository URL to download and install the addon.<br>
-                        Examples: https://github.com/ElvUI-WotLK/ElvUI or just "ElvUI-WotLK/ElvUI"
-                    </div>
-                </div>
-            </div>
-
-            <div class="options-group">
-                <h3>
-                    Installed Addons
-                    <button class="btn btn-primary" onclick="checkForUpdates()" style="margin-left: 10px; font-size: 0.9em;">Check for Updates</button>
-                </h3>
-                <div id="addon-list">
-                    <div class="addon-item">
-                        <div class="addon-info">
-                            <div class="addon-name">No addons installed</div>
-                            <div class="addon-description">Install addons from GitHub repositories above</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="options-group">
-                <h3>Addon Settings</h3>
-                <div class="option-item">
-                    <label for="auto-update-addons">Auto-update addons on launch:</label>
-                    <select id="auto-update-addons">
-                        <option value="false">No</option>
-                        <option value="true">Yes</option>
-                    </select>
-                    <div class="option-description">Automatically check for addon updates when launching the game</div>
-                </div>
-
-                <div class="option-item">
-                    <label for="addon-backup">Backup existing addons before update:</label>
-                    <select id="addon-backup">
-                        <option value="true">Yes</option>
-                        <option value="false">No</option>
-                    </select>
-                    <div class="option-description">Create backups of existing addons before installing updates</div>
                 </div>
             </div>
         </div>
