@@ -1,3 +1,12 @@
+// Global error handler - catch any errors before initialization
+window.onerror = function(message, source, lineno, colno, error) {
+    console.error('Global error caught:', { message, source, lineno, colno, error });
+    alert(`Global Error: ${message}\nAt: ${source}:${lineno}:${colno}\n\nCheck console for details.`);
+    return false;
+};
+
+console.log('Renderer.js loaded');
+
 // Main application state
 let appState = {
     config: null,
@@ -10,6 +19,8 @@ let appState = {
     realmAddress: '',
     wineInfo: null
 };
+
+console.log('App state initialized');
 
 // DOM elements
 const elements = {
@@ -51,6 +62,18 @@ const elements = {
 async function initializeApp() {
     try {
         showLoading('Loading configuration...');
+        
+        console.log('Starting initialization...');
+        console.log('Checking DOM elements...');
+        
+        // Verify critical DOM elements exist
+        const criticalElements = ['server-name', 'main-action-button', 'progress-container'];
+        for (const id of criticalElements) {
+            if (!document.getElementById(id)) {
+                throw new Error(`Critical DOM element missing: ${id}`);
+            }
+        }
+        console.log('All critical DOM elements found');
 
         // Get configuration and platform info from main process
         console.log('Loading configuration...');
@@ -100,6 +123,18 @@ async function initializeApp() {
         console.error('Failed to initialize app:', error);
         console.error('Error stack:', error.stack);
         hideLoading();
+        
+        // Show detailed error in production
+        const errorDetails = `
+Error: ${error.message}
+
+Stack: ${error.stack}
+
+Config loaded: ${appState.config ? 'Yes' : 'No'}
+Platform info: ${appState.platform ? 'Yes' : 'No'}
+        `.trim();
+        
+        console.log('Full error details:', errorDetails);
         showError('Failed to initialize launcher. Please restart the application.');
     }
 }
