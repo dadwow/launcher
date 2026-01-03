@@ -26,7 +26,9 @@ window.addEventListener('message', (event) => {
     if (event.data.type === 'initializeWithData') {
         // Initialize the options with the data passed from parent
         console.log('Initializing with data from parent:', event.data.config, event.data.settings);
-        initializeWithData(event.data.config, event.data.settings);
+        initializeWithData(event.data.config, event.data.settings).catch(error => {
+            console.error('Failed to initialize with data:', error);
+        });
     }
 });
 
@@ -136,7 +138,7 @@ async function initializeOptions() {
 }
 
 // Initialize with data passed from parent window
-function initializeWithData(config, settings) {
+async function initializeWithData(config, settings) {
     try {
         console.log('Initializing settings with data:', config, settings);
         
