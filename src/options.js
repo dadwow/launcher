@@ -140,7 +140,7 @@ async function initializeOptions() {
 // Initialize with data passed from parent window
 async function initializeWithData(config, settings) {
     try {
-        console.log('Initializing settings with data:', config, settings);
+
         
         // Set the data that would normally come from electronAPI
         optionsState.config = config;
@@ -174,15 +174,10 @@ async function initializeWithData(config, settings) {
 // Set up event listeners
 function setupEventListeners() {
     try {
-        console.log('Setting up event listeners...');
-        console.log('tabButtons found:', elements.tabButtons.length);
-        console.log('tabContents found:', elements.tabContents.length);
-        
+
         // Tab switching
         elements.tabButtons.forEach(button => {
-            console.log('Adding listener to tab button:', button.dataset.tab);
-            button.addEventListener('click', () => {
-                console.log('Tab clicked:', button.dataset.tab);
+            button.addEventListener('click', (e) => {
                 switchTab(button.dataset.tab);
             });
         });
@@ -247,10 +242,7 @@ function setupEventListeners() {
 
 // Tab switching functionality
 function switchTab(tabName) {
-    console.log('switchTab called with:', tabName);
-    console.log('Available tabButtons:', elements.tabButtons.length);
-    console.log('Available tabContents:', elements.tabContents.length);
-    
+
     // Update buttons
     elements.tabButtons.forEach(button => {
         const isActive = button.dataset.tab === tabName;

@@ -68,7 +68,20 @@
             "!**/.git/**/*",
             "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
             "!**/node_modules/.bin",
-            "!src/**/*.map"
+            "!**/node_modules/**/*.md",
+            "!**/node_modules/**/{LICENSE,license}",
+            "!**/node_modules/**/{test,tests,__tests__}/**",
+            "!**/node_modules/**/*.{map,ts}",
+            "!src/**/*.map",
+            "!tests/**",
+            "!coverage/**",
+            "!**/*.test.js",
+            "!jest.config.js",
+            "!*.md",
+            "!SETUP_GUIDE.md",
+            "!WINDOWS_BUILD.md",
+            "!CROSS_PLATFORM_GUIDE.md",
+            "!CI_CD_SETUP.md"
         ],
         "asarUnpack": [
             "node_modules/node-stream-zip/**/*"
