@@ -7,7 +7,11 @@
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    background: linear-gradient(135deg, rgba(26, 26, 46, 0.95) 0%, rgba(22, 33, 62, 0.95) 100%), url('../assets/bg.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
     color: #ffffff;
     min-height: 100vh;
     overflow-x: hidden;
@@ -65,10 +69,17 @@ body {
 
 .status-dot.online {
     background: #4caf50;
+    animation: none;
 }
 
 .status-dot.offline {
     background: #f44336;
+    animation: none;
+}
+
+.status-dot.checking {
+    background: #ffa500;
+    animation: pulse 2s infinite;
 }
 
 @keyframes pulse {

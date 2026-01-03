@@ -32,6 +32,45 @@ Edit the `.env` file to configure:
 - Development: `npm start`
 - Build for distribution: `npm run build`
 
+## Testing
+
+This launcher includes a comprehensive test suite covering all critical functionality.
+
+### Quick Test
+```bash
+./test-status.sh
+```
+
+### Run All Tests
+```bash
+npm test
+```
+
+### Run Tests with Coverage
+```bash
+npm run test:coverage
+```
+
+### Run Specific Test Suite
+```bash
+./run-tests.sh addon-install     # Addon installation tests
+./run-tests.sh addon-update      # Addon update tests
+./run-tests.sh launcher-update   # Launcher self-update tests
+./run-tests.sh integration       # Full workflow tests
+```
+
+### Test Coverage
+- ✅ Client file downloading
+- ✅ Zip extraction with nested folder handling
+- ✅ Addon installation from GitHub
+- ✅ Addon update detection and updating
+- ✅ Launcher self-updates
+- ✅ Error handling and edge cases
+
+See [TESTING.md](TESTING.md) for detailed testing documentation.
+
+**Current Status:** 🟢 31/31 tests passing
+
 ## Requirements
 
 - Node.js 16+
