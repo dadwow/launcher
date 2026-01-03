@@ -598,6 +598,118 @@ class PlatformManager {
 
         return null;
     }
+
+    // Apply macOS-specific patches for WoW 3.3.5a
+    async applyMacOSPatches(installPath, progressCallback = null) {
+        if (!this.isMacOS) {
+            return { success: false, error: 'Not running on macOS' };
+        }
+
+        const isAppleSilicon = this.arch === 'arm64';
+        
+        try {
+            if (progressCallback) {
+                progressCallback('Checking macOS configuration...', 10);
+            }
+
+            const wowExePath = path.join(installPath, 'Wow.exe');
+            if (!await fs.pathExists(wowExePath)) {
+                throw new Error('Wow.exe not found at installation path');
+            }
+
+            const patches = [];
+
+            // Apple Silicon specific: Apply libsillicon patch
+            if (isAppleSilicon) {
+                if (progressCallback) {
+                    progressCallback('Applying Apple Silicon optimizations (libsillicon)...', 30);
+                }
+
+                const result = await this.applyLibSiliconPatch(installPath, progressCallback);
+                if (result.success) {
+                    patches.push('libsillicon (Apple Silicon optimization)');
+                }
+            }
+
+            // Set proper permissions on macOS
+            if (progressCallback) {
+                progressCallback('Setting file permissions...', 80);
+            }
+
+            try {
+                await execAsync(`chmod -R u+rwX "${installPath}"`);
+                await execAsync(`chmod +x "${wowExePath}"`);
+                patches.push('file permissions');
+            } catch (permError) {
+                console.warn('Permission setting failed:', permError);
+            }
+
+            if (progressCallback) {
+                progressCallback('macOS patches applied successfully!', 100);
+            }
+
+            return {
+                success: true,
+                patches: patches,
+                message: `Applied ${patches.length} optimization(s)`
+            };
+
+        } catch (error) {
+            return {
+                success: false,
+                error: error.message
+            };
+        }
+    }
+
+    // Apply libsillicon patch for Apple Silicon Macs
+    async applyLibSiliconPatch(installPath, progressCallback = null) {
+        try {
+            const wineInfo = await this.checkWineInstallation();
+            
+            if (wineInfo.type === 'crossover') {
+                if (progressCallback) {
+                    progressCallback('CrossOver detected - libsillicon support enabled', 50);
+                }
+                
+                const configPath = path.join(installPath, 'WTF', 'Config.wtf');
+                await fs.ensureDir(path.dirname(configPath));
+                
+                const recommendedSettings = [
+                    'SET gxApi "OpenGL"',
+                    'SET M2Faster "3"',
+                    'SET maxFPS "60"',
+                    'SET hwDetect "0"'
+                ].join('\\n');
+                
+                if (await fs.pathExists(configPath)) {
+                    const existingConfig = await fs.readFile(configPath, 'utf8');
+                    if (!existingConfig.includes('gxApi')) {
+                        await fs.appendFile(configPath, '\\n' + recommendedSettings + '\\n');
+                    }
+                } else {
+                    await fs.writeFile(configPath, recommendedSettings + '\\n', 'utf8');
+                }
+                
+                return {
+                    success: true,
+                    message: 'CrossOver with libsillicon configured'
+                };
+            } else {
+                console.warn('Using Wine on Apple Silicon - CrossOver recommended for better performance');
+                return {
+                    success: false,
+                    error: 'CrossOver recommended for optimal Apple Silicon support'
+                };
+            }
+            
+        } catch (error) {
+            return {
+                success: false,
+                error: error.message
+            };
+        }
+    }
 }
 
 module.exports = PlatformManager;

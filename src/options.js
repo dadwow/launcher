@@ -140,7 +140,7 @@ async function initializeOptions() {
 // Initialize with data passed from parent window
 async function initializeWithData(config, settings) {
     try {
-        console.log('Initializing settings with data:', config, settings);
+
         
         // Set the data that would normally come from electronAPI
         optionsState.config = config;
@@ -174,15 +174,10 @@ async function initializeWithData(config, settings) {
 // Set up event listeners
 function setupEventListeners() {
     try {
-        console.log('Setting up event listeners...');
-        console.log('tabButtons found:', elements.tabButtons.length);
-        console.log('tabContents found:', elements.tabContents.length);
-        
+
         // Tab switching
         elements.tabButtons.forEach(button => {
-            console.log('Adding listener to tab button:', button.dataset.tab);
-            button.addEventListener('click', () => {
-                console.log('Tab clicked:', button.dataset.tab);
+            button.addEventListener('click', (e) => {
                 switchTab(button.dataset.tab);
             });
         });
@@ -247,10 +242,7 @@ function setupEventListeners() {
 
 // Tab switching functionality
 function switchTab(tabName) {
-    console.log('switchTab called with:', tabName);
-    console.log('Available tabButtons:', elements.tabButtons.length);
-    console.log('Available tabContents:', elements.tabContents.length);
-    
+
     // Update buttons
     elements.tabButtons.forEach(button => {
         const isActive = button.dataset.tab === tabName;
@@ -277,6 +269,10 @@ async function browseForInstallPath() {
                 elements.installPathInput.value = selectedPath;
             }
             await checkInstallation();
+            
+            // Rescan addons with new install path
+            await loadInstalledAddons();
+            
             showToast('Installation path updated', 'success');
         }
     } catch (error) {
@@ -289,7 +285,10 @@ async function browseForInstallPath() {
 
 // Check WoW installation
 async function checkInstallation() {
+    setButtonLoading('check-installation', true);
+    
     if (!optionsState.installPath) {
+        setButtonLoading('check-installation', false);
         updateInstallationStatus('warning', 'Please select an installation directory.');
         return;
     }
@@ -305,14 +304,19 @@ async function checkInstallation() {
     } catch (error) {
         console.error('Error checking installation:', error);
         updateInstallationStatus('error', 'Error checking installation.');
+    } finally {
+        setButtonLoading('check-installation', false);
     }
 }
 
 // Test realm connection
 async function testRealmConnection() {
+    setButtonLoading('test-connection', true);
+    
     const realmAddress = optionsState.realmAddress || optionsState.config?.defaultRealm;
     
     if (!realmAddress) {
+        setButtonLoading('test-connection', false);
         updateConnectionStatus('error', 'Please enter a realm address');
         return;
     }
@@ -330,6 +334,9 @@ async function testRealmConnection() {
     } catch (error) {
         console.error('Error testing connection:', error);
         updateConnectionStatus('error', 'Error testing connection');
+    } finally {
+        const testBtn = document.getElementById('test-connection');
+        if (testBtn) setButtonLoading('test-connection', false);
     }
 }
 
@@ -385,6 +392,8 @@ async function installAddonFromGitHub() {
 // Save options
 async function saveOptions() {
     try {
+        setButtonLoading('save-options', true);
+        
         const settings = {
             installPath: elements.installPathInput?.value || optionsState.installPath,
             realmAddress: elements.realmAddressInput?.value || optionsState.realmAddress,
@@ -396,20 +405,21 @@ async function saveOptions() {
         };
 
         await proxyElectronAPICall('saveSettings', settings);
-        showInfo('Settings saved successfully!');
+        
+        setButtonFeedback('save-options', 'Saved!', 'success', 1500);
 
-        // Close modal after a short delay
+        // Close modal after feedback
         setTimeout(() => {
             if (window.parent !== window) {
                 window.parent.postMessage({ type: 'closeSettingsModal' }, '*');
             } else {
                 window.close();
             }
-        }, 1000);
+        }, 1500);
 
     } catch (error) {
         console.error('Error saving settings:', error);
-        showError('Failed to save settings');
+        setButtonFeedback('save-options', 'Save Failed', 'error', 2000);
     }
 }
 
@@ -848,6 +858,11 @@ function setButtonFeedback(buttonId, message, type = 'success', duration = 2000)
     
     const textSpan = button.querySelector('.btn-text');
     if (textSpan) {
+        // Store original text if not already stored
+        if (!button.dataset.originalText) {
+            button.dataset.originalText = textSpan.textContent;
+        }
+        
         // Show feedback message
         textSpan.textContent = message;
         
@@ -860,6 +875,7 @@ function setButtonFeedback(buttonId, message, type = 'success', duration = 2000)
             if (button.dataset.originalText) {
                 textSpan.textContent = button.dataset.originalText;
                 button.classList.remove(`btn-feedback-${type}`);
+                delete button.dataset.originalText; // Clear stored text for next use
             }
         }, duration);
     }

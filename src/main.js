@@ -6,6 +6,20 @@ const axios = require('axios');
 const StreamZip = require('node-stream-zip');
 const { spawn } = require('child_process');
 
+// Handle uncaught exceptions (especially EPIPE errors from broken pipes)
+process.on('uncaughtException', (error) => {
+    // Ignore EPIPE errors (broken pipe when stdout/stderr is closed)
+    if (error.code === 'EPIPE') {
+        return;
+    }
+    console.error('Uncaught exception:', error);
+});
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled promise rejection:', reason);
+});
+
 // Disable signature verification BEFORE importing autoUpdater
 process.env.ELECTRON_UPDATER_ALLOW_UNSIGNED = '1';
 
@@ -194,14 +208,28 @@ function createWindow() {
         }
     });
     
-    // Log console messages from renderer
+    // Log console messages from renderer (with error handling for EPIPE)
     mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
-        console.log(`[Renderer ${level}] ${message} (${sourceId}:${line})`);
+        try {
+            console.log(`[Renderer ${level}] ${message} (${sourceId}:${line})`);
+        } catch (error) {
+            // Ignore EPIPE errors when stdout is closed
+            if (error.code !== 'EPIPE') {
+                console.error('Error logging renderer message:', error);
+            }
+        }
     });
     
     // Log any errors in the renderer
     mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
-        console.error('Page failed to load:', errorCode, errorDescription);
+        try {
+            console.error('Page failed to load:', errorCode, errorDescription);
+        } catch (error) {
+            // Ignore EPIPE errors
+            if (error.code !== 'EPIPE') {
+                console.error('Error logging load failure:', error);
+            }
+        }
     });
 
     // Handle window closed
@@ -1562,6 +1590,21 @@ ipcMain.handle('install-wine-automatically', async (event) => {
 
 ipcMain.handle('check-wine-installing', () => {
     return platformManager.isWineInstalling();
+});
+
+// Apply macOS-specific patches (libsillicon for Apple Silicon)
+ipcMain.handle('apply-macos-patches', async (event, installPath) => {
+    try {
+        const result = await platformManager.applyMacOSPatches(installPath, (message, progress) => {
+            if (mainWindow) {
+                mainWindow.webContents.send('macos-patch-progress', { message, progress });
+            }
+        });
+        return result;
+    } catch (error) {
+        console.error('macOS patch error:', error);
+        return { success: false, error: error.message };
+    }
 });
 
 // Helper function to load settings

@@ -1,7 +1,7 @@
 // Global error handler - catch any errors before initialization
 window.onerror = function(message, source, lineno, colno, error) {
     console.error('Global error caught:', { message, source, lineno, colno, error });
-    alert(`Global Error: ${message}\nAt: ${source}:${lineno}:${colno}\n\nCheck console for details.`);
+    // Don't show alert - errors are logged to console
     return false;
 };
 
@@ -38,7 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
         loadingOverlay: document.getElementById('loading-overlay'),
         loadingText: document.getElementById('loading-text'),
 
-        // Update notification
+        // Update notification (hidden - we use main UI)
         updateNotification: document.getElementById('update-notification'),
         updateTitle: document.getElementById('update-title'),
         updateMessage: document.getElementById('update-message'),
@@ -46,6 +46,11 @@ document.addEventListener('DOMContentLoaded', () => {
         updateDownloadBtn: document.getElementById('update-download-btn'),
         updateDismissBtn: document.getElementById('update-dismiss-btn')
     };
+    
+    // Hide update notification modal - we use main progress bar and button
+    if (elements.updateNotification) {
+        elements.updateNotification.style.display = 'none';
+    }
     
     const minimizeBtn = document.getElementById('minimize-btn');
     const closeBtn = document.getElementById('close-btn');
@@ -246,6 +251,17 @@ async function initializeApp() {
         console.log('Checking game status...');
         await checkGameStatus();
 
+        // Scan for installed addons if installation path exists
+        if (appState.installPath) {
+            console.log('Scanning for installed addons...');
+            try {
+                const addons = await window.electronAPI.getInstalledAddons(appState.installPath);
+                console.log(`Found ${addons.length} installed addon(s)`);
+            } catch (error) {
+                console.error('Failed to scan addons on startup:', error);
+            }
+        }
+
         // Set up event listeners
         console.log('Setting up event listeners...');
         setupEventListeners();
@@ -273,7 +289,7 @@ Stack trace:
 ${error.stack || 'No stack trace available'}`;
         
         console.log('Full error details:', errorDetails);
-        alert(errorDetails);
+        // Error logged to console for debugging
     }
 }
 
@@ -388,8 +404,20 @@ function closeSettingsModal() {
             if (backdrop) backdrop.classList.remove('closing');
             if (content) content.classList.remove('closing');
             
+            // Clear iframe to prevent any interference with main window
+            if (elements.settingsIframe) {
+                elements.settingsIframe.src = 'about:blank';
+            }
+            
             // Refresh main window data after closing settings
             checkGameStatus();
+            
+            // Rescan addons in case install path changed
+            if (appState.installPath) {
+                window.electronAPI.getInstalledAddons(appState.installPath)
+                    .then(addons => console.log(`Rescanned: ${addons.length} addon(s) found`))
+                    .catch(err => console.error('Failed to rescan addons:', err));
+            }
         }, 300);
     }
 }
@@ -644,31 +672,51 @@ function handleExtractionProgress(event, data) {
 }
 
 // Handle download completion
-function handleDownloadComplete() {
-    showInfo('Download completed successfully! Client files installed.');
+async function handleDownloadComplete() {
+    showInfo('✅ Client files downloaded and extracted successfully!');
     resetDownloadUI();
     appState.isDownloading = false;
     appState.downloadPaused = false;
 
     // Recheck installation status
-    setTimeout(async () => {
-        await checkGameStatus();
+    await checkGameStatus();
+    
+    // AUTOMATIC INSTALLATION FLOW FOR NON-WINDOWS
+    if (appState.platform.needsWine && !appState.wineInfo?.installed) {
+        const isAppleSilicon = appState.platform.isMacOS && appState.platform.arch === 'arm64';
+        const recommendedTool = appState.platform.isMacOS ? 'CrossOver' : 'Wine';
         
-        // If on non-Windows platform and Wine/CrossOver not installed, prompt user
-        if (appState.platform.needsWine && !appState.wineInfo?.installed) {
-            const isAppleSilicon = appState.platform.isMacOS && appState.platform.arch === 'arm64';
-            const recommendedTool = appState.platform.isMacOS ? (isAppleSilicon ? 'CrossOver' : 'Wine/CrossOver') : 'Wine';
-            const extraInfo = isAppleSilicon 
-                ? ' CrossOver is highly recommended for Apple Silicon Macs.'
-                : '';
+        showInfo(
+            `🔧 Installing ${recommendedTool} (Windows compatibility layer)...\n\n` +
+            `This is required to run WoW on ${appState.platform.platformName}.`
+        );
+        
+        try {
+            // Automatically install Wine/CrossOver
+            await installWineAutomatically();
+            
+            // After Wine/CrossOver is installed, apply macOS-specific patches
+            if (appState.platform.isMacOS && isAppleSilicon) {
+                showInfo('🍎 Applying Apple Silicon optimizations...');
+                await applyMacOSPatches();
+            }
+            
+            // Recheck status one final time
+            await checkGameStatus();
             
             showInfo(
-                `✅ Client files ready!\n\n` +
-                `Next Step: Install ${recommendedTool} to run WoW on ${appState.platform.platformName}.${extraInfo}\n\n` +
-                `Click "Install ${recommendedTool}" button or configure manually in Options.`
+                `✅ Installation Complete!\n\n` +
+                `World of Warcraft is now ready to play!`
+            );
+        } catch (error) {
+            console.error('Auto-installation error:', error);
+            showError(
+                `❌ Failed to auto-install ${recommendedTool}\n\n` +
+                `Error: ${error.message}\n\n` +
+                `Please install ${recommendedTool} manually and try again.`
             );
         }
-    }, 1000);
+    }
 }
 
 // Handle download errors
@@ -678,6 +726,50 @@ function handleDownloadError(event, error) {
     resetDownloadUI();
     appState.isDownloading = false;
     appState.downloadPaused = false;
+}
+
+// Automatically install Wine/CrossOver after client download
+async function installWineAutomatically() {
+    try {
+        showLoading('Installing compatibility layer...');
+        
+        const result = await window.electronAPI.installWineAutomatically();
+        
+        if (result.success) {
+            // Recheck Wine installation
+            appState.wineInfo = await window.electronAPI.checkWineInstallation();
+            hideLoading();
+            return true;
+        } else {
+            throw new Error(result.error || 'Installation failed');
+        }
+    } catch (error) {
+        hideLoading();
+        throw error;
+    }
+}
+
+// Apply macOS-specific patches (libsillicon for Apple Silicon)
+async function applyMacOSPatches() {
+    try {
+        showLoading('Applying macOS optimizations...');
+        
+        const result = await window.electronAPI.applyMacOSPatches(appState.installPath);
+        
+        if (result.success) {
+            hideLoading();
+            console.log('macOS patches applied successfully');
+            return true;
+        } else {
+            throw new Error(result.error || 'Failed to apply patches');
+        }
+    } catch (error) {
+        hideLoading();
+        console.error('macOS patch error:', error);
+        // Don't throw - patches are optional optimizations
+        showInfo(`⚠️ Optional optimization skipped: ${error.message}`);
+        return false;
+    }
 }
 
 // Reset download UI to initial state
@@ -912,10 +1004,9 @@ function showUpdateChecking() {
 }
 
 function hideUpdateNotification() {
-    setTimeout(() => {
-        elements.updateNotification.style.display = 'none';
-        checkGameStatus(); // Restore normal button state
-    }, 2000);
+    // Don't show notification modal - updates handled through main UI
+    console.log('Update notification hidden');
+    checkGameStatus(); // Restore normal button state
 }
 
 async function downloadLauncherUpdate() {
@@ -935,21 +1026,10 @@ async function downloadLauncherUpdate() {
 }
 
 function showUpdateNotification(version) {
-    elements.updateTitle.textContent = `Update Available: v${version}`;
-    elements.updateMessage.textContent = 'A new version of the launcher is available. Click Download to update.';
-    elements.updateNotification.style.display = 'block';
-    elements.updateDownloadBtn.style.display = 'block';
-    elements.updateDismissBtn.style.display = 'block';
-    elements.updateDownloadBtn.textContent = 'Download Update';
-    elements.updateDownloadBtn.disabled = false;
-    elements.updateIcon.style.animation = 'rotate 2s linear infinite';
-    
-    // Update main button too
+    // Don't show modal - use main button and status instead
+    console.log(`Update available: v${version}`);
+    updateGameStatus('warning', `🔄 Launcher update available: v${version}`);
     updateMainActionButton('update', `⬇️ Download Update v${version}`, true);
-    
-    elements.updateDownloadBtn.onclick = async () => {
-        await downloadLauncherUpdate();
-    };
 }
 
 function updateDownloadProgress(data) {
@@ -965,14 +1045,7 @@ function updateDownloadProgress(data) {
     elements.pauseButton.style.display = 'none'; // Can't pause launcher updates
     elements.cancelButton.style.display = 'none';
     updateMainActionButton('download', 'Downloading Update...', false);
-    
-    // Keep update notification visible but minimal
-    elements.updateNotification.style.display = 'block';
-    elements.updateTitle.textContent = 'Downloading Update...';
-    elements.updateMessage.textContent = `Version ${data.version || 'latest'}`;
-    elements.updateDownloadBtn.style.display = 'none';
-    elements.updateDismissBtn.style.display = 'none';
-    elements.updateIcon.style.animation = 'rotate 2s linear infinite';
+    updateGameStatus('warning', `Downloading update: ${percent}%`);
 }
 
 function showUpdateReady(version) {
@@ -980,20 +1053,8 @@ function showUpdateReady(version) {
     elements.progressContainer.style.display = 'none';
     
     // Update main action button to install update
+    updateGameStatus('success', `✅ Update v${version} ready to install!`);
     updateMainActionButton('update', `🎉 Install Update v${version}`, true);
-    
-    // Show notification
-    elements.updateTitle.textContent = 'Update Ready! 🎉';
-    elements.updateMessage.textContent = `Version ${version} is ready to install. Click the button below.`;
-    elements.updateNotification.style.display = 'block';
-    elements.updateDownloadBtn.style.display = 'none';
-    elements.updateDismissBtn.style.display = 'block';
-    elements.updateIcon.style.animation = 'none';
-    
-    elements.updateDismissBtn.onclick = () => {
-        elements.updateNotification.style.display = 'none';
-        checkGameStatus(); // Restore normal button state
-    };
 }
 
 // Clean up event listeners when the page unloads

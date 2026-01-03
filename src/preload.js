@@ -50,6 +50,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     installWineAutomatically: () => ipcRenderer.invoke('install-wine-automatically'),
     checkWineInstalling: () => ipcRenderer.invoke('check-wine-installing'),
 
+    // macOS-specific patches
+    applyMacOSPatches: (installPath) => ipcRenderer.invoke('apply-macos-patches', installPath),
+    onMacOSPatchProgress: (callback) => ipcRenderer.on('macos-patch-progress', callback),
+
     // Window management
     windowMinimize: () => ipcRenderer.invoke('window-minimize'),
     windowMaximize: () => ipcRenderer.invoke('window-maximize'),
