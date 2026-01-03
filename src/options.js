@@ -41,7 +41,6 @@ const elements = {
     realmAddressInput: document.getElementById('realm-address-options'),
     testRealmConnection: document.getElementById('test-realm-connection'),
     realmConnectionStatus: document.getElementById('realm-connection-status'),
-    serverNameInput: document.getElementById('server-name-options'),
     downloadUrlInput: document.getElementById('download-url-options'),
 
     // Addons tab
@@ -136,7 +135,6 @@ function populateForm() {
 
     // Server settings
     elements.realmAddressInput.value = optionsState.settings.realmAddress || optionsState.config.defaultRealm || '';
-    elements.serverNameInput.value = optionsState.settings.serverName || optionsState.config.serverName || '';
     elements.downloadUrlInput.value = optionsState.settings.downloadUrl || optionsState.config.downloadUrl || '';
 
     // Addon settings
@@ -554,7 +552,6 @@ async function saveOptions() {
 
             // Server settings
             realmAddress: elements.realmAddressInput.value,
-            serverName: elements.serverNameInput.value,
             downloadUrl: elements.downloadUrlInput.value,
 
             // Addon settings
@@ -586,7 +583,6 @@ async function resetToDefaults() {
         elements.autoUpdateRealmlist.value = 'true';
         elements.closeOnLaunch.value = 'false';
         elements.realmAddressInput.value = optionsState.config.defaultRealm || '';
-        elements.serverNameInput.value = optionsState.config.serverName || '';
         elements.downloadUrlInput.value = optionsState.config.downloadUrl || '';
         elements.autoUpdateAddons.value = 'false';
         elements.addonBackup.value = 'true';

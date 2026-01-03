@@ -51,6 +51,13 @@ body {
     margin-bottom: 5px;
 }
 
+.server-logo {
+    max-height: 60px;
+    width: auto;
+    margin-bottom: 10px;
+    object-fit: contain;
+}
+
 .server-status {
     display: flex;
     align-items: center;

@@ -5,6 +5,10 @@ const os = require('os');
 const axios = require('axios');
 const StreamZip = require('node-stream-zip');
 const { spawn } = require('child_process');
+
+// Disable signature verification BEFORE importing autoUpdater
+process.env.ELECTRON_UPDATER_ALLOW_UNSIGNED = '1';
+
 const { autoUpdater } = require('electron-updater');
 const PlatformManager = require('./platform-manager');
 
@@ -56,10 +60,10 @@ autoUpdater.autoDownload = false;
 autoUpdater.autoInstallOnAppQuit = true;
 autoUpdater.logger = console;
 
-// Disable signature verification for unsigned builds
-// Remove this if you sign your releases with a code signing certificate
+// Disable signature verification for unsigned builds on all platforms
+// Remove these if you sign your releases with a code signing certificate
 if (process.platform === 'win32') {
-    process.env.ELECTRON_UPDATER_ALLOW_UNSIGNED = '1';
+    autoUpdater.forceDevUpdateConfig = true; // Allow unsigned updates
 }
 
 // Auto-updater event handlers
@@ -1098,11 +1102,11 @@ ipcMain.handle('test-realm-connection', async (event, realmAddress) => {
         const startTime = Date.now();
 
         try {
-            // Try to connect to the realm on port 3724 (WoW login port)
+            // Try to connect to the realm on port 8085 (AzerothCore worldserver port)
             // This is a basic connectivity test
             const response = await axios({
                 method: 'GET',
-                url: `http://${realmAddress}:3724`,
+                url: `http://${realmAddress}:8085`,
                 timeout: 5000,
                 validateStatus: () => true // Accept any status code
             });
