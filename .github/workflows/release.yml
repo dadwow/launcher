@@ -136,14 +136,14 @@ jobs:
         with:
           name: ${{ matrix.artifact-name }}-build
           path: |
-            dist/**/*.exe
-            dist/**/*.dmg
-            dist/**/*.AppImage
-            dist/**/*.deb
-            dist/**/*.rpm
-            dist/**/*.snap
-            dist/**/*.tar.gz
-            dist/**/*.zip
+            dist/*.exe
+            dist/*.dmg
+            dist/*.AppImage
+            dist/*.deb
+            dist/*.rpm
+            dist/*.snap
+            dist/*.tar.gz
+            dist/*.zip
             dist/*.yml
             dist/*.blockmap
           retention-days: 5
@@ -175,11 +175,39 @@ jobs:
           ls -laR artifacts/
           echo "=== End of artifacts ==="
 
+      - name: Generate Changelog
+        id: changelog
+        run: |
+          # Get the previous tag
+          PREVIOUS_TAG=$(git tag --sort=-creatordate | grep -v "v${{ needs.check-release.outputs.version }}" | head -n 1)
+          
+          if [ -z "$PREVIOUS_TAG" ]; then
+            echo "No previous tag found, using all commits"
+            PREVIOUS_TAG=$(git rev-list --max-parents=0 HEAD)
+          fi
+          
+          echo "Generating changelog from $PREVIOUS_TAG to HEAD"
+          
+          # Generate changelog with better formatting
+          CHANGELOG=$(git log $PREVIOUS_TAG..HEAD --pretty=format:"- %s (%h)" --no-merges | grep -v "\[skip ci\]" | grep -v "Bump version" || echo "- Initial release")
+          
+          # Save to file for multiline output
+          echo "$CHANGELOG" > changelog.txt
+          
+          # Also create a formatted version with categories
+          echo "### 📝 What's Changed" > formatted_changelog.txt
+          echo "" >> formatted_changelog.txt
+          echo "$CHANGELOG" >> formatted_changelog.txt
+          
+          echo "Changelog generated successfully"
+
       - name: Create Release with all artifacts
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.check-release.outputs.version }}
           name: PlusCraft Launcher v${{ needs.check-release.outputs.version }}
+          body_path: formatted_changelog.txt
+          append_body: true
           body: |
             ## PlusCraft Launcher Release v${{ needs.check-release.outputs.version }}
 
@@ -187,12 +215,12 @@ jobs:
             A modern, feature-rich launcher for World of Warcraft 3.3.5a with automatic Wine installation and addon management.
 
             ### 📦 **Downloads:**
-            - **Windows**: Download the `Setup.exe` for easy installation or the portable `.exe` for no-install usage
-            - **macOS**: Download the `.dmg` file for Mac installation
-            - **Linux**: Download the `.AppImage` for universal Linux support, or use `.deb`/`.rpm` for package managers
+            - **Windows**: Download the installer or portable `.exe` for no-install usage
+            - **macOS**: Download the `.dmg` file for Mac installation (Intel & Apple Silicon)
+            - **Linux**: Download the `.AppImage` for universal support, or use `.deb` for Debian/Ubuntu
 
             ### ✨ **Key Features:**
-            - 🍷 **Automatic Wine Installation** - Seamless cross-platform compatibility
+            - 🍷 **Automatic Wine/CrossOver Installation** - Seamless cross-platform compatibility
             - 🔧 **Smart Action Button** - Context-aware download/launch functionality  
             - 📦 **GitHub Addon Manager** - Easy addon installation from repositories
             - ⚙️ **Environment Configuration** - Customizable via .env file
