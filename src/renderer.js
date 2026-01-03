@@ -67,7 +67,7 @@ async function initializeApp() {
         console.log('Checking DOM elements...');
         
         // Verify critical DOM elements exist
-        const criticalElements = ['server-name', 'main-action-button', 'progress-container'];
+        const criticalElements = ['main-action-button', 'progress-container'];
         for (const id of criticalElements) {
             if (!document.getElementById(id)) {
                 throw new Error(`Critical DOM element missing: ${id}`);
@@ -87,7 +87,9 @@ async function initializeApp() {
         console.log('Settings loaded:', appState.settings);
 
         // Update UI with configuration
-        elements.serverName.textContent = appState.config.serverName;
+        if (elements.serverName) {
+            elements.serverName.textContent = appState.config.serverName;
+        }
         
         // Update launcher version display
         if (appState.config.version && elements.launcherVersion) {
