@@ -12,6 +12,16 @@ process.env.ELECTRON_UPDATER_ALLOW_UNSIGNED = '1';
 const { autoUpdater } = require('electron-updater');
 const PlatformManager = require('./platform-manager');
 
+// Configure autoUpdater to allow unsigned builds
+autoUpdater.autoDownload = false;
+autoUpdater.autoInstallOnAppQuit = false;
+
+// Disable signature verification for Windows
+if (process.platform === 'win32') {
+    // Force update to bypass signature check on Windows
+    autoUpdater.forceDevUpdateConfig = true;
+}
+
 // Load .env from multiple possible locations
 const dotenv = require('dotenv');
 const envPaths = [

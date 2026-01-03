@@ -52,8 +52,10 @@
         "publish": {
             "provider": "github",
             "owner": "dadwow",
-            "repo": "launcher"
+            "repo": "launcher",
+            "private": false
         },
+        "forceCodeSigning": false,
         "directories": {
             "output": "dist"
         },
@@ -118,7 +120,12 @@
                 }
             ],
             "requestedExecutionLevel": "asInvoker",
-            "publisherName": "AC Launcher Team"
+            "publisherName": "AC Launcher Team",
+            "verifyUpdateCodeSignature": false,
+            "signingHashAlgorithms": [
+                "sha256"
+            ],
+            "sign": null
         },
         "nsis": {
             "oneClick": false,
