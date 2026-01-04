@@ -748,7 +748,7 @@ async function uninstallAddon(addonName) {
             removeBtn.disabled = true;
         }
         
-        await proxyElectronAPICall('uninstallAddon', addonName, installPath);
+        await proxyElectronAPICall('uninstall-addon', addonName, installPath);
         
         showToast(`${addonName} has been uninstalled successfully`, 'success');
         
@@ -921,9 +921,9 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Add to global scope for inline onclick handlers
-window.uninstallAddon = function(addonName) {
+window.uninstallAddon = async function(addonName) {
     if (confirm(`Are you sure you want to uninstall ${addonName}?`)) {
         console.log(`Uninstalling addon: ${addonName}`);
-        showInfo(`Addon uninstallation feature will be available soon!`);
+        await uninstallAddon(addonName);
     }
 };
