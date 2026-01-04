@@ -111,9 +111,9 @@ autoUpdater.on('checking-for-update', () => {
 autoUpdater.on('update-available', (info) => {
     console.log('Update available:', info.version);
     if (mainWindow) {
-        mainWindow.webContents.send('update-status', { 
-            status: 'available', 
-            version: info.version 
+        mainWindow.webContents.send('update-status', {
+            status: 'available',
+            version: info.version
         });
     }
 });
@@ -128,17 +128,17 @@ autoUpdater.on('update-not-available', (info) => {
 autoUpdater.on('error', (err) => {
     console.error('Update error:', err);
     if (mainWindow) {
-        mainWindow.webContents.send('update-status', { 
-            status: 'error', 
-            message: err.message 
+        mainWindow.webContents.send('update-status', {
+            status: 'error',
+            message: err.message
         });
     }
 });
 
 autoUpdater.on('download-progress', (progressObj) => {
     if (mainWindow) {
-        mainWindow.webContents.send('update-status', { 
-            status: 'downloading', 
+        mainWindow.webContents.send('update-status', {
+            status: 'downloading',
             percent: progressObj.percent,
             transferred: progressObj.transferred,
             total: progressObj.total
@@ -149,7 +149,7 @@ autoUpdater.on('download-progress', (progressObj) => {
 autoUpdater.on('update-downloaded', (info) => {
     console.log('Update downloaded');
     if (mainWindow) {
-        mainWindow.webContents.send('update-status', { 
+        mainWindow.webContents.send('update-status', {
             status: 'downloaded',
             version: info.version
         });
@@ -158,7 +158,7 @@ autoUpdater.on('update-downloaded', (info) => {
 
 function createWindow() {
     console.log('Creating main window...');
-    
+
     // Create the browser window
     mainWindow = new BrowserWindow({
         width: config.width,
@@ -207,7 +207,7 @@ function createWindow() {
             mainWindow.webContents.openDevTools();
         }
     });
-    
+
     // Log console messages from renderer (with error handling for EPIPE)
     mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
         try {
@@ -219,7 +219,7 @@ function createWindow() {
             }
         }
     });
-    
+
     // Log any errors in the renderer
     mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
         try {
@@ -346,7 +346,7 @@ function createMenu() {
     ];
 
     const menu = Menu.buildFromTemplate(template);
-    
+
     // Hide menu on Windows (but keep it on macOS and Linux)
     if (process.platform === 'win32') {
         Menu.setApplicationMenu(null);
@@ -379,7 +379,7 @@ app.whenReady().then(() => {
         }, 2000);
     } catch (error) {
         console.error('Failed to initialize application:', error);
-        dialog.showErrorBox('Initialization Error', 
+        dialog.showErrorBox('Initialization Error',
             `Failed to start the launcher.\n\nError: ${error.message}\n\nPlease check the console logs for details.`);
         app.quit();
     }
@@ -408,7 +408,7 @@ ipcMain.handle('get-config', () => {
         if (!platformManager) {
             throw new Error('Platform manager not initialized');
         }
-        
+
         const configData = {
             serverName: config.serverName,
             defaultRealm: config.defaultRealm,
@@ -417,7 +417,7 @@ ipcMain.handle('get-config', () => {
             platform: platformManager.getPlatformInfo(),
             version: app.getVersion()
         };
-        
+
         console.log('Returning config to renderer:', configData);
         return configData;
     } catch (error) {
@@ -501,9 +501,59 @@ ipcMain.handle('check-wow-installation', async (event, installPath) => {
 });
 
 // Download functionality
+// Validate download URL before starting download
+async function validateDownloadUrl(url) {
+    try {
+        const response = await axios.head(url, {
+            timeout: 10000,
+            maxRedirects: 10,
+            headers: {
+                'User-Agent': 'PlusCraft-Launcher/1.0'
+            }
+        });
+
+        const contentType = response.headers['content-type'] || '';
+        const contentLength = response.headers['content-length'];
+
+        console.log('URL validation result:', {
+            status: response.status,
+            contentType,
+            contentLength,
+            finalUrl: response.config.url
+        });
+
+        // Check if it's likely a zip file
+        if (!contentType.includes('application/zip') &&
+            !contentType.includes('application/octet-stream') &&
+            !contentType.includes('application/x-zip-compressed')) {
+            console.warn('Warning: Content-Type does not indicate a zip file:', contentType);
+        }
+
+        return {
+            valid: true,
+            contentLength: parseInt(contentLength, 10) || 0,
+            contentType
+        };
+    } catch (error) {
+        console.error('URL validation failed:', error);
+        return {
+            valid: false,
+            error: error.message
+        };
+    }
+}
+
 ipcMain.handle('start-download', async (event, url, destination) => {
     if (downloadState.isDownloading) {
         throw new Error('Download already in progress');
+    }
+
+    console.log('Starting download:', { url, destination });
+
+    // Validate URL before starting download
+    const validation = await validateDownloadUrl(url);
+    if (!validation.valid) {
+        throw new Error('Invalid or inaccessible download URL: ' + validation.error);
     }
 
     try {
@@ -518,16 +568,34 @@ ipcMain.handle('start-download', async (event, url, destination) => {
 
         const zipPath = path.join(destination, 'wow-client.zip');
 
-        // Start the download
+        console.log('Initiating HTTP request to:', url);
+
+        // Start the download with comprehensive error handling
         const response = await axios({
             method: 'GET',
             url: url,
             responseType: 'stream',
-            signal: downloadState.controller.signal
+            signal: downloadState.controller.signal,
+            timeout: 30000, // 30 second timeout for initial connection
+            maxRedirects: 10, // Allow redirects (for bit.ly URLs)
+            validateStatus: (status) => status >= 200 && status < 300,
+            headers: {
+                'User-Agent': 'PlusCraft-Launcher/1.0'
+            }
+        });
+
+        console.log('Download response received:', {
+            status: response.status,
+            contentLength: response.headers['content-length'],
+            contentType: response.headers['content-type']
         });
 
         downloadState.totalBytes = parseInt(response.headers['content-length'], 10) || 0;
         downloadState.response = response;
+
+        if (downloadState.totalBytes === 0) {
+            console.warn('Warning: Content-Length header not present, progress tracking may be limited');
+        }
 
         const writer = fs.createWriteStream(zipPath);
         downloadState.writer = writer;
@@ -535,40 +603,71 @@ ipcMain.handle('start-download', async (event, url, destination) => {
         let downloadedBytes = 0;
         let lastProgressTime = Date.now();
 
+        // Handle stream errors
+        writer.on('error', (error) => {
+            console.error('Write stream error:', error);
+            downloadState.isDownloading = false;
+            if (!downloadState.controller.signal.aborted) {
+                mainWindow.webContents.send('download-error', {
+                    message: 'Failed to write download file: ' + error.message
+                });
+            }
+        });
+
         response.data.on('data', (chunk) => {
-            if (!downloadState.isPaused) {
-                writer.write(chunk);
-                downloadedBytes += chunk.length;
-                downloadState.downloadedBytes = downloadedBytes;
+            if (!downloadState.isPaused && downloadState.isDownloading) {
+                try {
+                    writer.write(chunk);
+                    downloadedBytes += chunk.length;
+                    downloadState.downloadedBytes = downloadedBytes;
 
-                // Throttle progress updates to avoid overwhelming the UI
-                const now = Date.now();
-                if (now - lastProgressTime > 100) { // Update every 100ms
-                    const percent = downloadState.totalBytes > 0 ? (downloadedBytes / downloadState.totalBytes) * 100 : 0;
-                    const elapsed = (now - downloadState.startTime) / 1000;
-                    const bytesPerSecond = elapsed > 0 ? downloadedBytes / elapsed : 0;
+                    // Throttle progress updates to avoid overwhelming the UI
+                    const now = Date.now();
+                    if (now - lastProgressTime > 100) { // Update every 100ms
+                        const percent = downloadState.totalBytes > 0 ? (downloadedBytes / downloadState.totalBytes) * 100 : 0;
+                        const elapsed = (now - downloadState.startTime) / 1000;
+                        const bytesPerSecond = elapsed > 0 ? downloadedBytes / elapsed : 0;
 
-                    mainWindow.webContents.send('download-progress', {
-                        transferred: downloadedBytes,
-                        total: downloadState.totalBytes,
-                        percent: percent,
-                        bytesPerSecond: bytesPerSecond
+                        mainWindow.webContents.send('download-progress', {
+                            transferred: downloadedBytes,
+                            total: downloadState.totalBytes,
+                            percent: Math.round(percent * 100) / 100,
+                            bytesPerSecond: bytesPerSecond
+                        });
+
+                        lastProgressTime = now;
+                    }
+                } catch (writeError) {
+                    console.error('Error writing chunk:', writeError);
+                    downloadState.isDownloading = false;
+                    mainWindow.webContents.send('download-error', {
+                        message: 'Write error: ' + writeError.message
                     });
-
-                    lastProgressTime = now;
                 }
             }
         });
 
         response.data.on('end', async () => {
-            writer.end();
+            console.log('Download stream ended, total bytes downloaded:', downloadedBytes);
 
-            if (!downloadState.isPaused && downloadState.isDownloading) {
-                try {
+            try {
+                await new Promise((resolve, reject) => {
+                    writer.end((error) => {
+                        if (error) {
+                            reject(error);
+                        } else {
+                            resolve();
+                        }
+                    });
+                });
+
+                if (!downloadState.isPaused && downloadState.isDownloading) {
+                    console.log('Starting file extraction...');
+
                     // Extract the zip file
                     mainWindow.webContents.send('download-progress', {
-                        transferred: downloadState.totalBytes,
-                        total: downloadState.totalBytes,
+                        transferred: downloadState.totalBytes || downloadedBytes,
+                        total: downloadState.totalBytes || downloadedBytes,
                         percent: 100,
                         bytesPerSecond: 0
                     });
@@ -581,27 +680,67 @@ ipcMain.handle('start-download', async (event, url, destination) => {
                     await extractZipFile(zipPath, destination);
 
                     // Clean up zip file
+                    console.log('Cleaning up zip file...');
                     await fs.remove(zipPath);
 
                     downloadState.isDownloading = false;
+                    console.log('Download completed successfully');
                     mainWindow.webContents.send('download-complete');
-                } catch (extractError) {
-                    downloadState.isDownloading = false;
-                    mainWindow.webContents.send('download-error', { message: 'Failed to extract files: ' + extractError.message });
                 }
+            } catch (extractError) {
+                console.error('Extraction/cleanup error:', extractError);
+                downloadState.isDownloading = false;
+                mainWindow.webContents.send('download-error', {
+                    message: 'Failed to extract files: ' + extractError.message
+                });
             }
         });
 
         response.data.on('error', (error) => {
+            console.error('Download stream error:', error);
             downloadState.isDownloading = false;
+
+            // Close writer if it exists
+            if (downloadState.writer) {
+                try {
+                    downloadState.writer.destroy();
+                } catch (e) {
+                    console.error('Error destroying writer:', e);
+                }
+            }
+
             if (!downloadState.controller.signal.aborted) {
-                mainWindow.webContents.send('download-error', { message: error.message });
+                const errorMessage = error.code === 'ENOTFOUND'
+                    ? 'Network error: Unable to connect to download server'
+                    : error.code === 'ECONNRESET'
+                        ? 'Connection was reset by the server'
+                        : error.code === 'ETIMEDOUT'
+                            ? 'Download timed out'
+                            : 'Download error: ' + error.message;
+
+                mainWindow.webContents.send('download-error', { message: errorMessage });
             }
         });
 
     } catch (error) {
+        console.error('Download initialization error:', error);
         downloadState.isDownloading = false;
-        throw error;
+
+        let errorMessage = 'Failed to start download';
+
+        if (error.code === 'ENOTFOUND') {
+            errorMessage = 'Invalid download URL or network connection issue';
+        } else if (error.code === 'ECONNREFUSED') {
+            errorMessage = 'Download server refused connection';
+        } else if (error.response) {
+            errorMessage = `Server responded with ${error.response.status}: ${error.response.statusText}`;
+        } else if (error.message.includes('timeout')) {
+            errorMessage = 'Connection timed out while connecting to download server';
+        } else {
+            errorMessage = error.message;
+        }
+
+        throw new Error(errorMessage);
     }
 });
 
@@ -655,9 +794,9 @@ ipcMain.handle('validate-addon-repo', async (event, owner, repo) => {
         });
 
         const contents = contentsResponse.data;
-        
+
         // Check for .toc files in root
-        const hasTocInRoot = contents.some(file => 
+        const hasTocInRoot = contents.some(file =>
             file.name.endsWith('.toc') && file.type === 'file'
         );
 
@@ -670,7 +809,7 @@ ipcMain.handle('validate-addon-repo', async (event, owner, repo) => {
         } else {
             // Check subdirectories for .toc files
             const directories = contents.filter(item => item.type === 'dir');
-            
+
             for (const dir of directories.slice(0, 10)) { // Limit to first 10 dirs
                 try {
                     const dirContentsResponse = await axios.get(dir.url, {
@@ -678,7 +817,7 @@ ipcMain.handle('validate-addon-repo', async (event, owner, repo) => {
                     });
                     const dirContents = dirContentsResponse.data;
                     const dirTocFiles = dirContents.filter(file => file.name.endsWith('.toc'));
-                    
+
                     if (dirTocFiles.length > 0) {
                         addonFolders.push({
                             folder: dir.name,
@@ -695,7 +834,7 @@ ipcMain.handle('validate-addon-repo', async (event, owner, repo) => {
         let readme = null;
         try {
             const readmeResponse = await axios.get(`https://api.github.com/repos/${owner}/${repo}/readme`, {
-                headers: { 
+                headers: {
                     'User-Agent': 'PlusCraft-Launcher',
                     'Accept': 'application/vnd.github.v3.raw'
                 }
@@ -851,7 +990,7 @@ async function extractZipFile(zipPath, extractPath) {
     try {
         // Ensure extract path exists
         await fs.ensureDir(extractPath);
-        
+
         // Open and extract zip file
         zip = new StreamZip.async({ file: zipPath });
         await zip.extract(null, extractPath);
@@ -860,25 +999,25 @@ async function extractZipFile(zipPath, extractPath) {
 
         // Check if extraction created a single root folder
         const extractedContents = await fs.readdir(extractPath);
-        
+
         // If there's only one item and it's a directory, move its contents up
         if (extractedContents.length === 1) {
             const singleItem = extractedContents[0];
             const singleItemPath = path.join(extractPath, singleItem);
-            
+
             try {
                 const stat = await fs.stat(singleItemPath);
-                
+
                 if (stat.isDirectory()) {
                     // Move contents from nested folder to parent
                     const nestedContents = await fs.readdir(singleItemPath);
-                    
+
                     for (const item of nestedContents) {
                         const oldPath = path.join(singleItemPath, item);
                         const newPath = path.join(extractPath, item);
                         await fs.move(oldPath, newPath, { overwrite: true });
                     }
-                    
+
                     // Remove the now-empty nested folder
                     await fs.remove(singleItemPath);
                 }
@@ -908,7 +1047,7 @@ ipcMain.handle('install-addon-from-github', async (event, owner, repo, installPa
 
         // Check if git is available
         const hasGit = await checkGitAvailable();
-        
+
         if (hasGit) {
             console.log('Using git clone for addon installation');
             return await installAddonWithGit(owner, repo, addonPath);
@@ -939,26 +1078,26 @@ async function checkGitAvailable() {
 async function installAddonWithGit(owner, repo, addonPath) {
     const repoUrl = `https://github.com/${owner}/${repo}.git`;
     const tempClonePath = path.join(addonPath, `temp_${repo}`);
-    
+
     // Remove temp directory if it exists
     if (await fs.pathExists(tempClonePath)) {
         await fs.remove(tempClonePath);
     }
-    
+
     console.log(`Cloning ${repoUrl} to ${tempClonePath}`);
-    
+
     // Clone the repository
     await new Promise((resolve, reject) => {
         const gitClone = spawn('git', ['clone', '--depth', '1', repoUrl, tempClonePath]);
-        
+
         gitClone.stdout.on('data', (data) => {
             console.log(`git: ${data}`);
         });
-        
+
         gitClone.stderr.on('data', (data) => {
             console.log(`git: ${data}`);
         });
-        
+
         gitClone.on('close', (code) => {
             if (code === 0) {
                 resolve();
@@ -966,33 +1105,33 @@ async function installAddonWithGit(owner, repo, addonPath) {
                 reject(new Error(`Git clone failed with code ${code}`));
             }
         });
-        
+
         gitClone.on('error', (error) => {
             reject(error);
         });
     });
-    
+
     // Remove .git directory to save space
     const gitDir = path.join(tempClonePath, '.git');
     if (await fs.pathExists(gitDir)) {
         await fs.remove(gitDir);
     }
-    
+
     // Check if the cloned folder contains .toc file(s)
     const clonedContents = await fs.readdir(tempClonePath);
     const rootTocFiles = clonedContents.filter(f => f.endsWith('.toc'));
-    
+
     if (rootTocFiles.length > 0) {
         // The repo itself is the addon
         console.log('Root folder contains .toc files, treating as single addon');
         const targetPath = path.join(addonPath, repo);
-        
+
         if (await fs.pathExists(targetPath)) {
             await fs.remove(targetPath);
         }
-        
+
         await fs.move(tempClonePath, targetPath);
-        
+
         // Store metadata for update tracking
         const metadataPath = path.join(targetPath, '.github-addon-metadata');
         await fs.writeJson(metadataPath, {
@@ -1001,7 +1140,7 @@ async function installAddonWithGit(owner, repo, addonPath) {
             installedAt: new Date().toISOString(),
             method: 'git'
         });
-        
+
         console.log(`Installed addon: ${repo}`);
         return { success: true, addons: [repo] };
     } else {
@@ -1018,19 +1157,19 @@ async function installAddonWithGit(owner, repo, addonPath) {
                 }
             }
         }
-        
+
         if (addonFolders.length > 0) {
             // Install each addon folder
             for (const addonFolder of addonFolders) {
                 const sourcePath = path.join(tempClonePath, addonFolder);
                 const targetPath = path.join(addonPath, addonFolder);
-                
+
                 if (await fs.pathExists(targetPath)) {
                     await fs.remove(targetPath);
                 }
-                
+
                 await fs.move(sourcePath, targetPath);
-                
+
                 // Store metadata
                 const metadataPath = path.join(targetPath, '.github-addon-metadata');
                 await fs.writeJson(metadataPath, {
@@ -1039,13 +1178,13 @@ async function installAddonWithGit(owner, repo, addonPath) {
                     installedAt: new Date().toISOString(),
                     method: 'git'
                 });
-                
+
                 console.log(`Installed addon: ${addonFolder}`);
             }
-            
+
             // Clean up temp directory
             await fs.remove(tempClonePath);
-            
+
             return { success: true, addons: addonFolders };
         } else {
             throw new Error('Could not find any .toc files. This does not appear to be a valid WoW addon.');
@@ -1076,9 +1215,9 @@ async function installAddonWithArchive(owner, repo, addonPath) {
             try {
                 downloadUrl = `https://github.com/${owner}/${repo}/archive/refs/heads/${branch}.zip`;
                 zipPath = path.join(addonPath, `${repo}.zip`);
-                
+
                 console.log(`Trying to download from: ${downloadUrl}`);
-                
+
                 const response = await axios({
                     method: 'GET',
                     url: downloadUrl,
@@ -1117,7 +1256,7 @@ async function installAddonWithArchive(owner, repo, addonPath) {
         // Find the main addon folder (usually repo-branchname)
         const extractedContents = await fs.readdir(tempExtractPath);
         console.log('Extracted contents:', extractedContents);
-        
+
         const mainFolder = extractedContents.find(folder =>
             folder.startsWith(`${repo}-`) || folder === repo
         );
@@ -1127,24 +1266,24 @@ async function installAddonWithArchive(owner, repo, addonPath) {
         }
 
         const sourcePath = path.join(tempExtractPath, mainFolder);
-        
+
         // Check if there are multiple addon folders inside or if this folder itself is an addon
         const sourceContents = await fs.readdir(sourcePath);
         console.log('Source contents:', sourceContents);
-        
+
         // First, check if the root folder itself contains a .toc file (repo IS the addon)
         const rootTocFiles = sourceContents.filter(f => f.endsWith('.toc'));
-        
+
         if (rootTocFiles.length > 0) {
             // The extracted folder itself is the addon
             console.log('Root folder contains .toc files, treating as single addon');
             const targetPath = path.join(addonPath, repo);
-            
+
             // Remove existing installation
             if (await fs.pathExists(targetPath)) {
                 await fs.remove(targetPath);
             }
-            
+
             // Move addon to final location
             await fs.move(sourcePath, targetPath);
             console.log(`Installed addon: ${repo}`);
@@ -1168,12 +1307,12 @@ async function installAddonWithArchive(owner, repo, addonPath) {
                 for (const addonFolder of addonFolders) {
                     const addonSourcePath = path.join(sourcePath, addonFolder);
                     const addonTargetPath = path.join(addonPath, addonFolder);
-                    
+
                     // Remove existing installation
                     if (await fs.pathExists(addonTargetPath)) {
                         await fs.remove(addonTargetPath);
                     }
-                    
+
                     // Move addon to final location
                     await fs.move(addonSourcePath, addonTargetPath);
                     console.log(`Installed addon: ${addonFolder}`);
@@ -1202,10 +1341,10 @@ async function installAddonWithArchive(owner, repo, addonPath) {
             const addonTargetPath = path.join(addonPath, addonFolder);
             const repoFile = path.join(addonTargetPath, '.github-repo');
             await fs.writeFile(repoFile, `${owner}/${repo}`, 'utf8');
-            
+
             const commitFile = path.join(addonTargetPath, '.github-commit');
             await fs.writeFile(commitFile, latestCommit, 'utf8');
-            
+
             // Store metadata
             const metadataPath = path.join(addonTargetPath, '.github-addon-metadata');
             await fs.writeJson(metadataPath, {
@@ -1228,12 +1367,12 @@ async function installAddonWithArchive(owner, repo, addonPath) {
 ipcMain.handle('check-addon-updates', async (event, addons) => {
     try {
         const updates = [];
-        
+
         for (const addon of addons) {
             if (!addon.githubRepo) continue;
-            
+
             const [owner, repo] = addon.githubRepo.split('/');
-            
+
             try {
                 // Get latest commit from default branch
                 const repoInfoUrl = `https://api.github.com/repos/${owner}/${repo}`;
@@ -1241,23 +1380,23 @@ ipcMain.handle('check-addon-updates', async (event, addons) => {
                     headers: { 'User-Agent': 'WoW-Launcher' }
                 });
                 const defaultBranch = repoInfoResponse.data.default_branch;
-                
+
                 const commitsUrl = `https://api.github.com/repos/${owner}/${repo}/commits/${defaultBranch}`;
                 const commitsResponse = await axios.get(commitsUrl, {
                     headers: { 'User-Agent': 'WoW-Launcher' }
                 });
-                
+
                 const latestCommit = commitsResponse.data.sha;
                 const latestDate = commitsResponse.data.commit.committer.date;
-                
+
                 // Check if addon folder has stored commit info
                 const commitFile = path.join(addon.path, '.github-commit');
                 let currentCommit = null;
-                
+
                 if (await fs.pathExists(commitFile)) {
                     currentCommit = (await fs.readFile(commitFile, 'utf8')).trim();
                 }
-                
+
                 // If no commit file or commits differ, update is available
                 if (!currentCommit || currentCommit !== latestCommit) {
                     updates.push({
@@ -1289,7 +1428,7 @@ ipcMain.handle('check-addon-updates', async (event, addons) => {
                 });
             }
         }
-        
+
         return { success: true, updates };
     } catch (error) {
         console.error('Error checking addon updates:', error);
@@ -1301,18 +1440,18 @@ ipcMain.handle('check-addon-updates', async (event, addons) => {
 ipcMain.handle('update-addon', async (event, githubRepo, installPath) => {
     try {
         const [owner, repo] = githubRepo.split('/');
-        
+
         // Get repo info to find default branch
         const repoInfoUrl = `https://api.github.com/repos/${owner}/${repo}`;
         const repoInfoResponse = await axios.get(repoInfoUrl, {
             headers: { 'User-Agent': 'WoW-Launcher' }
         });
         const defaultBranch = repoInfoResponse.data.default_branch;
-        
+
         // Download latest version
         const downloadUrl = `https://github.com/${owner}/${repo}/archive/refs/heads/${defaultBranch}.zip`;
         const zipPath = path.join(app.getPath('temp'), `${repo}-update.zip`);
-        
+
         const response = await axios({
             url: downloadUrl,
             method: 'GET',
@@ -1358,11 +1497,11 @@ ipcMain.handle('update-addon', async (event, githubRepo, installPath) => {
         for (const item of allFiles) {
             const itemPath = path.join(sourcePath, item);
             const itemStat = await fs.stat(itemPath);
-            
+
             if (itemStat.isDirectory()) {
                 const subFiles = await fs.readdir(itemPath);
                 const hasToc = subFiles.some(file => file.endsWith('.toc'));
-                
+
                 if (hasToc) {
                     addonFolders.push(item);
                 }
@@ -1374,19 +1513,19 @@ ipcMain.handle('update-addon', async (event, githubRepo, installPath) => {
             for (const addonFolder of addonFolders) {
                 const addonSourcePath = path.join(sourcePath, addonFolder);
                 const addonTargetPath = path.join(addonPath, addonFolder);
-                
+
                 // Remove existing installation
                 if (await fs.pathExists(addonTargetPath)) {
                     await fs.remove(addonTargetPath);
                 }
-                
+
                 // Move addon to final location
                 await fs.move(addonSourcePath, addonTargetPath);
-                
+
                 // Save repo and commit info
                 const repoFile = path.join(addonTargetPath, '.github-repo');
                 await fs.writeFile(repoFile, githubRepo, 'utf8');
-                
+
                 // Get and save latest commit
                 const commitsUrl = `https://api.github.com/repos/${owner}/${repo}/commits/${defaultBranch}`;
                 const commitsResponse = await axios.get(commitsUrl, {
@@ -1399,16 +1538,16 @@ ipcMain.handle('update-addon', async (event, githubRepo, installPath) => {
         } else {
             // No .toc files found in subdirectories
             const targetPath = path.join(addonPath, repo);
-            
+
             if (await fs.pathExists(targetPath)) {
                 await fs.remove(targetPath);
             }
-            
+
             await fs.move(sourcePath, targetPath);
-            
+
             const repoFile = path.join(targetPath, '.github-repo');
             await fs.writeFile(repoFile, githubRepo, 'utf8');
-            
+
             const commitsUrl = `https://api.github.com/repos/${owner}/${repo}/commits/${defaultBranch}`;
             const commitsResponse = await axios.get(commitsUrl, {
                 headers: { 'User-Agent': 'WoW-Launcher' }
@@ -1417,11 +1556,11 @@ ipcMain.handle('update-addon', async (event, githubRepo, installPath) => {
             const commitFile = path.join(targetPath, '.github-commit');
             await fs.writeFile(commitFile, latestCommit, 'utf8');
         }
-        
+
         // Clean up
         await fs.remove(zipPath);
         await fs.remove(tempExtractPath);
-        
+
         return { success: true };
     } catch (error) {
         console.error('Error updating addon:', error);
