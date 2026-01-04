@@ -78,11 +78,8 @@
             "!coverage/**",
             "!**/*.test.js",
             "!jest.config.js",
-            "!*.md",
-            "!SETUP_GUIDE.md",
-            "!WINDOWS_BUILD.md",
-            "!CROSS_PLATFORM_GUIDE.md",
-            "!CI_CD_SETUP.md"
+            "!docs/**",
+            "!*.md"
         ],
         "asarUnpack": [
             "node_modules/node-stream-zip/**/*"
@@ -98,6 +95,15 @@
             "category": "public.app-category.games",
             "icon": "build/icon.png",
             "artifactName": "PlusCraft-Launcher-${arch}.${ext}",
+            "extraResources": [
+                {
+                    "from": "resources",
+                    "to": "resources",
+                    "filter": [
+                        "**/*"
+                    ]
+                }
+            ],
             "target": [
                 {
                     "target": "dmg",
