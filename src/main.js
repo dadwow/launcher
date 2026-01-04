@@ -26,10 +26,11 @@ process.env.ELECTRON_UPDATER_ALLOW_UNSIGNED = '1';
 const { autoUpdater } = require('electron-updater');
 const PlatformManager = require('./platform-manager');
 
-// Configure autoUpdater to allow unsigned builds
-autoUpdater.autoDownload = false;
-autoUpdater.autoInstallOnAppQuit = true;
-autoUpdater.logger = console;
+// Configure autoUpdater - disable all notifications, handle UI manually
+autoUpdater.autoDownload = false; // Don't auto-download updates
+autoUpdater.autoInstallOnAppQuit = true; // Install on quit if downloaded
+autoUpdater.logger = null; // Disable console logging
+autoUpdater.allowDowngrade = false; // Don't allow downgrades
 
 // Disable signature verification for Windows
 if (process.platform === 'win32') {
@@ -358,6 +359,11 @@ function createMenu() {
 // App event handlers
 app.whenReady().then(() => {
     try {
+        // Suppress any notification permissions - we don't use system notifications
+        if (app.setAsDefaultProtocolClient) {
+            app.setAsDefaultProtocolClient('wow');
+        }
+        
         // Initialize platform manager
         console.log('Initializing platform manager...');
         platformManager = new PlatformManager();
@@ -369,12 +375,11 @@ app.whenReady().then(() => {
         // Check for updates after a short delay (2 seconds) to let the app fully load
         setTimeout(() => {
             if (!config.devMode) {
-                console.log('Checking for updates...');
+                // Silently check for updates - no notifications
                 autoUpdater.checkForUpdates().catch(err => {
-                    console.error('Auto-updater check failed:', err);
+                    // Suppress update check errors - don't notify user
+                    console.error('Auto-updater check failed (suppressed):', err.message);
                 });
-            } else {
-                console.log('Skipping update check in dev mode');
             }
         }, 2000);
     } catch (error) {
