@@ -936,10 +936,7 @@ ipcMain.handle('get-realmlist', async (event, installPath) => {
 // Launch WoW
 ipcMain.handle('launch-wow', async (event, installPath) => {
     try {
-        const settings = await loadSettingsFromFile();
-        const result = await platformManager.launchWoW(installPath, {
-            prefixPath: settings.winePrefixPath || platformManager.getWinePrefixPath(installPath)
-        });
+        const result = await platformManager.launchWoW(installPath);
 
         // Minimize the launcher window when WoW launches
         if (mainWindow && !mainWindow.isDestroyed()) {
@@ -1002,29 +999,46 @@ async function extractZipFile(zipPath, extractPath) {
         await zip.close();
         zip = null;
 
-        // Check if extraction created a single root folder
+        // Check if extraction created a single root folder with no files
         const extractedContents = await fs.readdir(extractPath);
+        
+        // Filter out hidden files and zip files
+        const visibleContents = extractedContents.filter(item => 
+            !item.startsWith('.') && !item.endsWith('.zip')
+        );
 
-        // If there's only one item and it's a directory, move its contents up
-        if (extractedContents.length === 1) {
-            const singleItem = extractedContents[0];
+        // If there's only one visible item and it's a directory, check if we should move its contents up
+        if (visibleContents.length === 1) {
+            const singleItem = visibleContents[0];
             const singleItemPath = path.join(extractPath, singleItem);
 
             try {
                 const stat = await fs.stat(singleItemPath);
 
                 if (stat.isDirectory()) {
-                    // Move contents from nested folder to parent
+                    // Check if this folder contains WoW.exe
                     const nestedContents = await fs.readdir(singleItemPath);
+                    const hasWowExe = nestedContents.some(item => 
+                        item.toLowerCase() === 'wow.exe'
+                    );
 
-                    for (const item of nestedContents) {
-                        const oldPath = path.join(singleItemPath, item);
-                        const newPath = path.join(extractPath, item);
-                        await fs.move(oldPath, newPath, { overwrite: true });
+                    // Only move contents up if this appears to be the WoW client folder
+                    if (hasWowExe) {
+                        console.log(`Found nested WoW client in folder: ${singleItem}, moving contents up...`);
+                        
+                        // Move contents from nested folder to parent
+                        for (const item of nestedContents) {
+                            const oldPath = path.join(singleItemPath, item);
+                            const newPath = path.join(extractPath, item);
+                            await fs.move(oldPath, newPath, { overwrite: true });
+                        }
+
+                        // Remove the now-empty nested folder
+                        await fs.remove(singleItemPath);
+                        console.log('Successfully flattened nested directory structure');
+                    } else {
+                        console.log(`Single folder found but doesn't contain WoW.exe, leaving structure as-is`);
                     }
-
-                    // Remove the now-empty nested folder
-                    await fs.remove(singleItemPath);
                 }
             } catch (statError) {
                 console.error('Error processing nested folder:', statError);

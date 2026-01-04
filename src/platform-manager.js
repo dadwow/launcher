@@ -139,73 +139,24 @@ class PlatformManager {
         }
     }
 
-    // Wine prefix management
+    // Wine prefix management (deprecated - kept for compatibility)
+    // TurtleSilicon approach doesn't require Wine prefixes
     getWinePrefixPath(installPath) {
-        if (this.isWindows) return null;
-
-        const homeDir = os.homedir();
-        const prefixName = 'wow-335a';
-
-        if (this.isMacOS) {
-            return path.join(homeDir, '.wine-wow');
-        } else if (this.isLinux) {
-            return path.join(homeDir, '.wine-wow');
-        }
-
+        // No longer used with TurtleSilicon-style launching
         return null;
     }
 
     async createWinePrefix(prefixPath) {
-        if (this.isWindows || !prefixPath) return true;
-
-        const wine = await this.checkWineInstallation();
-        if (!wine.installed) {
-            throw new Error('Wine is not installed');
-        }
-
-        try {
-            // Create wine prefix
-            await execAsync(`WINEPREFIX="${prefixPath}" ${wine.path} wineboot`, {
-                env: { ...process.env, WINEPREFIX: prefixPath }
-            });
-
-            // Install necessary Windows components for WoW
-            await this.installWineComponents(prefixPath, wine.path);
-
-            return true;
-        } catch (error) {
-            console.error('Failed to create wine prefix:', error);
-            throw error;
-        }
+        // No longer required with TurtleSilicon-style launching
+        // Wine/CrossOver will handle configuration automatically
+        return true;
     }
 
     async installWineComponents(prefixPath, winePath) {
-        const components = [
-            'vcrun2019',  // Visual C++ Redistributable
-            'corefonts',  // Windows fonts
-            'd3dx9',      // DirectX 9
-            'dxvk'        // Vulkan-based D3D implementation (if available)
-        ];
-
-        // Use winetricks if available
-        try {
-            await execAsync('which winetricks');
-
-            for (const component of components) {
-                try {
-                    console.log(`Installing ${component}...`);
-                    await execAsync(`WINEPREFIX="${prefixPath}" winetricks -q ${component}`, {
-                        env: { ...process.env, WINEPREFIX: prefixPath },
-                        timeout: 300000 // 5 minute timeout per component
-                    });
-                } catch (error) {
-                    console.warn(`Failed to install ${component}:`, error.message);
-                    // Continue with other components
-                }
-            }
-        } catch (error) {
-            console.warn('Winetricks not available, skipping component installation');
-        }
+        // No longer required with TurtleSilicon-style launching
+        // Wine/CrossOver will handle DirectX and dependencies automatically
+        console.log('Wine components installation skipped (TurtleSilicon approach)');
+        return true;
     }
 
     // Platform-specific WoW launching
@@ -213,6 +164,7 @@ class PlatformManager {
         if (this.isWindows) {
             return this.launchWoWWindows(installPath);
         } else {
+            // Use TurtleSilicon-style launching (no Wine prefix needed)
             return this.launchWoWWine(installPath, wineConfig);
         }
     }
@@ -245,44 +197,48 @@ class PlatformManager {
             throw new Error('WoW.exe not found in installation directory');
         }
 
-        // Determine wine prefix
-        const prefixPath = wineConfig?.prefixPath || this.getWinePrefixPath(installPath);
-
-        // Ensure wine prefix exists
-        if (prefixPath && !(await fs.pathExists(prefixPath))) {
-            await this.createWinePrefix(prefixPath);
+        // Use TurtleSilicon-style launching (direct wine loader invocation without wineboot)
+        // This is more reliable and doesn't require Wine prefix creation
+        
+        let winePath = wine.path;
+        
+        // For CrossOver on macOS, use wineloader2 if available (TurtleSilicon patch)
+        if (this.isMacOS && wine.type === 'crossover') {
+            const crossoverApp = wine.path.includes('CrossOver.app') 
+                ? wine.path.substring(0, wine.path.indexOf('CrossOver.app') + 'CrossOver.app'.length)
+                : '/Applications/CrossOver.app';
+                
+            const wineloader2Path = path.join(
+                crossoverApp,
+                'Contents/SharedSupport/CrossOver/CrossOver-Hosted Application/wineloader2'
+            );
+            
+            // Check if wineloader2 exists (TurtleSilicon patch applied)
+            if (await fs.pathExists(wineloader2Path)) {
+                console.log('Using wineloader2 (TurtleSilicon-compatible launcher)');
+                winePath = wineloader2Path;
+            } else {
+                console.log('wineloader2 not found, using standard CrossOver wine');
+            }
         }
 
-        // Set up environment variables
+        // Set up environment variables (TurtleSilicon-style)
         const env = {
             ...process.env,
-            WINEPREFIX: prefixPath,
-            WINEDLLOVERRIDES: 'mscoree,mshtml=', // Disable .NET and IE components
-            WINE_CPU_TOPOLOGY: '4:2', // Optimize CPU topology for WoW
+            WINEDLLOVERRIDES: 'd3d9=n,b', // Native d3d9 override
+            MVK_CONFIG_SYNCHRONOUS_QUEUE_SUBMITS: '1',
+            DXVK_ASYNC: '1'
         };
 
         // Platform-specific optimizations
         if (this.isMacOS) {
             env.DYLD_FALLBACK_LIBRARY_PATH = '/usr/lib';
+            env.MTL_HUD_ENABLED = '0'; // Disable Metal HUD for performance
             
-            // CrossOver and Apple Silicon optimizations
-            if (wine.type === 'crossover') {
-                env.CX_BOTTLE = 'WoW335a';
-                env.CX_LOG = 'warn'; // Reduce log verbosity
-                
-                // Apple Silicon specific: Use libsillicon/turtlesillicon patches
-                if (os.arch() === 'arm64' || wine.isAppleSilicon) {
-                    // Enable Rosetta 2 translation with optimizations
-                    env.DYLD_LIBRARY_PATH = '/opt/homebrew/lib';
-                    env.WINE_LARGE_ADDRESS_AWARE = '1';
-                    
-                    // CrossOver-specific Apple Silicon flags
-                    env.CX_PLATFORM = 'arm64';
-                    env.MTL_HUD_ENABLED = '0'; // Disable Metal HUD for performance
-                }
-            } else {
-                // Standard Wine on macOS
-                env.WINE_MAC_DRIVER = '0';
+            // Apple Silicon specific optimizations
+            if (os.arch() === 'arm64') {
+                env.DYLD_LIBRARY_PATH = '/opt/homebrew/lib';
+                env.WINE_LARGE_ADDRESS_AWARE = '1';
             }
         } else if (this.isLinux) {
             // Linux-specific optimizations
@@ -292,7 +248,8 @@ class PlatformManager {
         }
 
         try {
-            const wowProcess = spawn(wine.path, [wowExePath], {
+            // Launch WoW directly without Wine prefix (TurtleSilicon approach)
+            const wowProcess = spawn(winePath, [wowExePath], {
                 cwd: installPath,
                 env: env,
                 detached: true,
@@ -300,6 +257,8 @@ class PlatformManager {
             });
 
             wowProcess.unref();
+            
+            console.log(`WoW launched successfully using ${wine.type} (${winePath})`);
             return { success: true, process: wowProcess };
         } catch (error) {
             throw new Error(`Failed to launch WoW with Wine: ${error.message}`);
