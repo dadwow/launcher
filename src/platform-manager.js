@@ -279,8 +279,9 @@ class PlatformManager {
         }
     }
 
-    // Install TurtleSilicon patches (required for Apple Silicon)
-    // Automatically installs bundled patch files to WoW directory and CrossOver
+    // Install TurtleSilicon patches (ONLY for Apple Silicon Macs)
+    // These patches solve the x87 FPU limitation when running x86 WoW through Rosetta 2
+    // NOT applicable to Windows (native) or Linux (x86_64 Wine)
     async installTurtleSiliconPatches(installPath, wine) {
         const { app } = require('electron');
         const { execSync } = require('child_process');
@@ -292,6 +293,13 @@ class PlatformManager {
             rosettax87Path: null,
             errors: []
         };
+
+        // 🛡️ GUARD: Only install patches on macOS Apple Silicon (arm64)
+        // Windows and Linux x86_64 don't need these patches
+        if (!this.isMacOS || os.arch() !== 'arm64') {
+            console.log('Skipping TurtleSilicon patches - not Apple Silicon');
+            return result; // Return empty result, caller will handle appropriately
+        }
 
         try {
             // Get bundled resources path
@@ -414,6 +422,8 @@ class PlatformManager {
     }
 
     // Launch WoW with rosettax87 service (TurtleSilicon method for Apple Silicon)
+    // macOS Apple Silicon ONLY - solves x87 FPU issues with Rosetta 2 translation
+    // This method is NOT used on Windows (native) or Linux (x86_64 Wine)
     async launchWithRosettaX87(installPath, wineloader2Path) {
         // Check which winerosetta method we're using FIRST
         const divxDecoderPath = path.join(installPath, 'DivxDecoder.dll');

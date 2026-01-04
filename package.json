@@ -87,13 +87,6 @@
             {
                 "from": ".env",
                 "to": ".env"
-            },
-            {
-                "from": "resources",
-                "to": "resources",
-                "filter": [
-                    "**/*"
-                ]
             }
         ],
         "icon": "build/icon.png",
@@ -101,6 +94,15 @@
             "category": "public.app-category.games",
             "icon": "build/icon.png",
             "artifactName": "PlusCraft-Launcher-${arch}.${ext}",
+            "extraResources": [
+                {
+                    "from": "resources",
+                    "to": "resources",
+                    "filter": [
+                        "**/*"
+                    ]
+                }
+            ],
             "target": [
                 {
                     "target": "dmg",
