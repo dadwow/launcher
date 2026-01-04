@@ -56,6 +56,7 @@
             "repo": "launcher",
             "private": false
         },
+        "electronUpdaterCompatibility": ">=2.16.0",
         "forceCodeSigning": false,
         "directories": {
             "output": "dist"

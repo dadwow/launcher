@@ -26,11 +26,18 @@ process.env.ELECTRON_UPDATER_ALLOW_UNSIGNED = '1';
 const { autoUpdater } = require('electron-updater');
 const PlatformManager = require('./platform-manager');
 
+// 🔇 DISABLE ALL BUILT-IN NOTIFICATIONS FROM ELECTRON-UPDATER
+// This prevents the popup notifications in the bottom-right corner
+// We handle all update UI through custom renderer UI instead
+process.env.APPIMAGE = '1'; // Trick to disable notifications on all platforms
+
 // Configure autoUpdater - disable all notifications, handle UI manually
 autoUpdater.autoDownload = false; // Don't auto-download updates
 autoUpdater.autoInstallOnAppQuit = true; // Install on quit if downloaded
 autoUpdater.logger = null; // Disable console logging
 autoUpdater.allowDowngrade = false; // Don't allow downgrades
+autoUpdater.fullChangelog = false; // Don't fetch full changelog
+autoUpdater.allowPrerelease = false; // Don't check for pre-releases
 
 // Disable signature verification for Windows
 if (process.platform === 'win32') {
