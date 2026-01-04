@@ -1,5 +1,5 @@
 // Global error handler - catch any errors before initialization
-window.onerror = function(message, source, lineno, colno, error) {
+window.onerror = function (message, source, lineno, colno, error) {
     console.error('Global error caught:', { message, source, lineno, colno, error });
     // Don't show alert - errors are logged to console
     return false;
@@ -46,12 +46,12 @@ document.addEventListener('DOMContentLoaded', () => {
         updateDownloadBtn: document.getElementById('update-download-btn'),
         updateDismissBtn: document.getElementById('update-dismiss-btn')
     };
-    
+
     // Hide update notification modal - we use main progress bar and button
     if (elements.updateNotification) {
         elements.updateNotification.style.display = 'none';
     }
-    
+
     const minimizeBtn = document.getElementById('minimize-btn');
     const closeBtn = document.getElementById('close-btn');
 
@@ -66,7 +66,7 @@ document.addEventListener('DOMContentLoaded', () => {
             window.electronAPI.windowClose();
         });
     }
-    
+
     // Listen for messages from settings iframe
     window.addEventListener('message', (event) => {
         if (event.data && event.data.type === 'closeSettingsModal') {
@@ -80,7 +80,7 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const { requestId, method, args } = event.data;
                 const result = await window.electronAPI[method](...args);
-                
+
                 // Send response back to iframe
                 event.source.postMessage({
                     type: 'electronAPI-response',
@@ -96,13 +96,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 }, '*');
             }
         }
-        
+
         // Handle new proxy electronAPI calls
         if (event.data.type === 'electronAPICall') {
             try {
                 const { id, method, args } = event.data;
                 const result = await window.electronAPI[method](...args);
-                
+
                 // Send response back to iframe
                 event.source.postMessage({
                     type: 'electronAPIResponse',
@@ -119,14 +119,14 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
-    
+
     // Close modal with Escape key
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape' && elements.settingsModal && elements.settingsModal.style.display === 'flex') {
             closeSettingsModal();
         }
     });
-    
+
     // Setup modal backdrop click handler after DOM is loaded
     const settingsModal = document.getElementById('settings-modal');
     if (settingsModal) {
@@ -135,7 +135,7 @@ document.addEventListener('DOMContentLoaded', () => {
             backdrop.addEventListener('click', closeSettingsModal);
         }
     }
-    
+
     // Setup update notification button handlers
     if (elements.updateDownloadBtn) {
         elements.updateDownloadBtn.addEventListener('click', async () => {
@@ -153,27 +153,27 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
-    
+
     if (elements.updateDismissBtn) {
         elements.updateDismissBtn.addEventListener('click', () => {
             elements.updateNotification.style.display = 'none';
         });
     }
-    
+
     // Add iframe error handling to prevent load errors
     if (elements.settingsIframe) {
         elements.settingsIframe.addEventListener('error', (e) => {
             console.warn('Settings iframe error (expected during initialization):', e);
         });
-        
+
         elements.settingsIframe.addEventListener('load', () => {
             console.log('Settings iframe loaded successfully');
         });
-        
+
         // Prevent initial src loading which might cause errors
         elements.settingsIframe.src = 'about:blank';
     }
-    
+
     // Initialize the app after DOM and elements are ready
     initializeApp();
 });
@@ -200,10 +200,10 @@ let elements = {};
 async function initializeApp() {
     try {
         showLoading('Loading configuration...');
-        
+
         console.log('Starting initialization...');
         console.log('Checking DOM elements...');
-        
+
         // Verify critical DOM elements exist
         const criticalElements = ['main-action-button', 'progress-container'];
         for (const id of criticalElements) {
@@ -217,10 +217,10 @@ async function initializeApp() {
         console.log('Loading configuration...');
         appState.config = await window.electronAPI.getConfig();
         console.log('Config loaded:', appState.config);
-        
+
         appState.platform = appState.config.platform;
         console.log('Platform info:', appState.platform);
-        
+
         appState.settings = await window.electronAPI.loadSettings();
         console.log('Settings loaded:', appState.settings);
 
@@ -228,7 +228,7 @@ async function initializeApp() {
         if (elements.serverName) {
             elements.serverName.textContent = appState.config.serverName;
         }
-        
+
         // Update launcher version display
         if (appState.config.version && elements.launcherVersion) {
             elements.launcherVersion.textContent = `Launcher v${appState.config.version}`;
@@ -274,7 +274,7 @@ async function initializeApp() {
         console.error('Failed to initialize app:', error);
         console.error('Error stack:', error.stack);
         hideLoading();
-        
+
         // Show detailed error in production
         const errorDetails = `Failed to initialize launcher
 
@@ -287,7 +287,7 @@ Platform info: ${appState.platform ? 'Yes' : 'No'}
 
 Stack trace:
 ${error.stack || 'No stack trace available'}`;
-        
+
         console.log('Full error details:', errorDetails);
         // Error logged to console for debugging
     }
@@ -296,11 +296,11 @@ ${error.stack || 'No stack trace available'}`;
 // Handle Wine installation progress updates
 function handleWineInstallProgress(event, data) {
     const { message, progress } = data;
-    
+
     elements.progressText.textContent = message;
     elements.progressFill.style.width = `${progress}%`;
     elements.progressPercentage.textContent = `${progress}%`;
-    
+
     console.log(`Wine installation progress: ${progress}% - ${message}`);
 }
 
@@ -326,10 +326,10 @@ function setupEventListeners() {
     window.electronAPI.onDownloadProgress(handleDownloadProgress);
     window.electronAPI.onDownloadComplete(handleDownloadComplete);
     window.electronAPI.onDownloadError(handleDownloadError);
-    
+
     // Extraction progress listener
     window.electronAPI.onExtractionProgress(handleExtractionProgress);
-    
+
     // Wine installation progress listener
     window.electronAPI.onWineInstallProgress(handleWineInstallProgress);
 
@@ -352,11 +352,11 @@ async function openSettings() {
         // Show the modal
         if (elements.settingsModal) {
             elements.settingsModal.style.display = 'flex';
-            
+
             // Load iframe content only when opening
             if (elements.settingsIframe) {
                 elements.settingsIframe.src = 'options.html';
-                
+
                 // Wait for iframe to load, then pass data to it
                 elements.settingsIframe.onload = async () => {
                     try {
@@ -364,10 +364,10 @@ async function openSettings() {
                         // Get all the data the iframe needs
                         const config = await window.electronAPI.getConfig();
                         const settings = await window.electronAPI.loadSettings();
-                        
+
                         console.log('Sending config to iframe:', config);
                         console.log('Sending settings to iframe:', settings);
-                        
+
                         // Send data to the iframe
                         elements.settingsIframe.contentWindow.postMessage({
                             type: 'initializeWithData',
@@ -392,26 +392,26 @@ function closeSettingsModal() {
     if (elements.settingsModal) {
         const backdrop = elements.settingsModal.querySelector('.settings-modal-backdrop');
         const content = elements.settingsModal.querySelector('.settings-modal-content');
-        
+
         // Add closing animation classes
         if (backdrop) backdrop.classList.add('closing');
         if (content) content.classList.add('closing');
-        
+
         // Hide modal after animation completes (300ms is the longest animation)
         setTimeout(() => {
             elements.settingsModal.style.display = 'none';
             // Remove closing classes for next time
             if (backdrop) backdrop.classList.remove('closing');
             if (content) content.classList.remove('closing');
-            
+
             // Clear iframe to prevent any interference with main window
             if (elements.settingsIframe) {
                 elements.settingsIframe.src = 'about:blank';
             }
-            
+
             // Refresh main window data after closing settings
             checkGameStatus();
-            
+
             // Rescan addons in case install path changed
             if (appState.installPath) {
                 window.electronAPI.getInstalledAddons(appState.installPath)
@@ -429,10 +429,10 @@ async function checkGameStatus() {
         updateMainActionButton('configure', 'Configure Settings', false);
         return;
     }
-    
+
     try {
         const installationCheck = await window.electronAPI.checkWowInstallation(appState.installPath);
-        
+
         // PRIORITY 1: Check if client files are downloaded
         if (!installationCheck.hasExecutable || !installationCheck.hasData) {
             appState.isWowInstalled = false;
@@ -446,7 +446,7 @@ async function checkGameStatus() {
             }
 
             updateGameStatus('error', message);
-            
+
             // Check if we can download
             const canDownload = appState.config.downloadUrl || appState.settings.downloadUrl;
             if (canDownload) {
@@ -456,14 +456,14 @@ async function checkGameStatus() {
             }
             return; // Stop here - download client first
         }
-        
+
         // PRIORITY 2: Client files exist, now check Wine/CrossOver on non-Windows
         if (appState.platform.needsWine && !appState.wineInfo?.installed) {
             updateGameStatus('warning', `Client ready. Wine/CrossOver required for ${appState.platform.platformName}`);
             updateMainActionButton('configure', 'Install Wine/CrossOver', true);
             return;
         }
-        
+
         // PRIORITY 3: Everything is ready
         if (installationCheck.isValid) {
             appState.isWowInstalled = true;
@@ -483,7 +483,7 @@ async function checkGameStatus() {
             }
 
             updateGameStatus('warning', message);
-            
+
             // Check if we can download
             const canDownload = appState.config.downloadUrl || appState.settings.downloadUrl;
             if (canDownload) {
@@ -504,28 +504,28 @@ async function installWineAutomatically() {
     try {
         updateMainActionButton('configure', 'Installing Wine...', false);
         updateGameStatus('warning', 'Installing Wine automatically...');
-        
+
         // Show progress container for Wine installation
         elements.progressContainer.style.display = 'block';
         elements.progressText.textContent = 'Preparing Wine installation...';
         elements.progressFill.style.width = '0%';
         elements.progressPercentage.textContent = '0%';
-        
+
         // Hide pause/cancel buttons for Wine installation
         elements.pauseButton.style.display = 'none';
         elements.cancelButton.style.display = 'none';
 
         const result = await window.electronAPI.installWineAutomatically();
-        
+
         if (result.success) {
             updateGameStatus('success', result.message);
-            
+
             // Recheck Wine installation
             appState.wineInfo = await window.electronAPI.checkWineInstallation();
-            
+
             // Hide progress and recheck game status
             elements.progressContainer.style.display = 'none';
-            
+
             if (result.requiresRestart) {
                 updateMainActionButton('configure', 'Restart Required', false);
                 showInfo('Wine installation completed! Please restart your Mac and then relaunch this application.');
@@ -538,7 +538,7 @@ async function installWineAutomatically() {
             elements.progressContainer.style.display = 'none';
             showError(`Automatic Wine installation failed: ${result.message}\n\nYou can try the manual installation method in Options.`);
         }
-        
+
     } catch (error) {
         console.error('Wine installation error:', error);
         updateGameStatus('error', 'Wine installation failed');
@@ -551,13 +551,13 @@ async function installWineAutomatically() {
 // Handle main action button click
 async function handleMainAction() {
     const buttonState = elements.mainActionButton.dataset.state;
-    
+
     // Check if we need to install Wine automatically
     if (appState.platform.needsWine && !appState.wineInfo?.installed) {
         await installWineAutomatically();
         return;
     }
-    
+
     switch (buttonState) {
         case 'configure':
             // Only open settings if DOM elements are ready
@@ -649,7 +649,7 @@ function handleDownloadProgress(event, progress) {
     elements.progressPercentage.textContent = `${percentage}%`;
     elements.progressFill.style.width = `${percentage}%`;
     elements.progressText.textContent = `Downloading Client: ${downloaded} / ${total} (${speed}/s)`;
-    
+
     // Show pause/cancel buttons for client downloads
     elements.pauseButton.style.display = 'inline-block';
     elements.cancelButton.style.display = 'inline-block';
@@ -662,11 +662,11 @@ function handleExtractionProgress(event, data) {
         elements.progressPercentage.textContent = '100%';
         elements.progressFill.style.width = '100%';
         elements.progressText.textContent = 'Extracting Client Files...';
-        
+
         // Hide pause/cancel buttons during extraction
         elements.pauseButton.style.display = 'none';
         elements.cancelButton.style.display = 'none';
-        
+
         updateMainActionButton('download', '📦 Extracting...', false);
     }
 }
@@ -680,30 +680,30 @@ async function handleDownloadComplete() {
 
     // Recheck installation status
     await checkGameStatus();
-    
+
     // AUTOMATIC INSTALLATION FLOW FOR NON-WINDOWS
     if (appState.platform.needsWine && !appState.wineInfo?.installed) {
         const isAppleSilicon = appState.platform.isMacOS && appState.platform.arch === 'arm64';
         const recommendedTool = appState.platform.isMacOS ? 'CrossOver' : 'Wine';
-        
+
         showInfo(
             `🔧 Installing ${recommendedTool} (Windows compatibility layer)...\n\n` +
             `This is required to run WoW on ${appState.platform.platformName}.`
         );
-        
+
         try {
             // Automatically install Wine/CrossOver
             await installWineAutomatically();
-            
+
             // After Wine/CrossOver is installed, apply macOS-specific patches
             if (appState.platform.isMacOS && isAppleSilicon) {
                 showInfo('🍎 Applying Apple Silicon optimizations...');
                 await applyMacOSPatches();
             }
-            
+
             // Recheck status one final time
             await checkGameStatus();
-            
+
             showInfo(
                 `✅ Installation Complete!\n\n` +
                 `World of Warcraft is now ready to play!`
@@ -721,8 +721,26 @@ async function handleDownloadComplete() {
 
 // Handle download errors
 function handleDownloadError(event, error) {
-    console.error('Download error:', error);
-    showError('Download failed: ' + error.message);
+    console.error('Download error received:', error);
+
+    let displayMessage = 'Download failed';
+
+    if (error && error.message) {
+        displayMessage = error.message;
+    }
+
+    // Add helpful suggestions based on error type
+    if (displayMessage.includes('Invalid or inaccessible download URL')) {
+        displayMessage += '\n\nPlease check:\n• Your internet connection\n• The download URL in Options\n• That the download server is online';
+    } else if (displayMessage.includes('Network error') || displayMessage.includes('ENOTFOUND')) {
+        displayMessage += '\n\nPlease check your internet connection and try again.';
+    } else if (displayMessage.includes('timeout')) {
+        displayMessage += '\n\nThe connection is slow or the server is not responding. Please try again later.';
+    } else if (displayMessage.includes('refused connection')) {
+        displayMessage += '\n\nThe download server is not accepting connections. Please try again later.';
+    }
+
+    showError(displayMessage);
     resetDownloadUI();
     appState.isDownloading = false;
     appState.downloadPaused = false;
@@ -732,9 +750,9 @@ function handleDownloadError(event, error) {
 async function installWineAutomatically() {
     try {
         showLoading('Installing compatibility layer...');
-        
+
         const result = await window.electronAPI.installWineAutomatically();
-        
+
         if (result.success) {
             // Recheck Wine installation
             appState.wineInfo = await window.electronAPI.checkWineInstallation();
@@ -753,9 +771,9 @@ async function installWineAutomatically() {
 async function applyMacOSPatches() {
     try {
         showLoading('Applying macOS optimizations...');
-        
+
         const result = await window.electronAPI.applyMacOSPatches(appState.installPath);
-        
+
         if (result.success) {
             hideLoading();
             console.log('macOS patches applied successfully');
@@ -811,7 +829,7 @@ async function launchWow() {
 
         await window.electronAPI.launchWow(appState.installPath);
         hideLoading();
-        
+
         console.log('World of Warcraft launched successfully!');
 
         // Close launcher if setting is enabled
@@ -859,7 +877,7 @@ function updateServerStatus(status, data = {}) {
     elements.statusDot.className = `status-dot ${status}`;
     elements.statusText.textContent = status === 'online' ? 'Server Online' :
         status === 'offline' ? 'Server Offline' : 'Checking...';
-    
+
     // Update tooltip with additional information
     const statusContainer = document.getElementById('server-status');
     if (statusContainer) {
@@ -877,11 +895,11 @@ async function checkServerStatus() {
     try {
         const config = await window.electronAPI.getConfig();
         const realmAddress = config.defaultRealm || 'play.ascend-digital.co.uk';
-        
+
         updateServerStatus('checking');
-        
+
         const result = await window.electronAPI.testRealmConnection(realmAddress);
-        
+
         if (result.success) {
             updateServerStatus('online', { ping: result.ping });
         } else {
@@ -898,7 +916,7 @@ let statusPollInterval;
 function startServerStatusPolling() {
     // Check immediately
     checkServerStatus();
-    
+
     // Then check every 30 seconds
     if (statusPollInterval) {
         clearInterval(statusPollInterval);
@@ -964,29 +982,29 @@ document.addEventListener('DOMContentLoaded', () => {
 // Auto-updater event handlers
 window.electronAPI.onUpdateStatus((event, data) => {
     console.log('Update status:', data);
-    
+
     switch (data.status) {
         case 'checking':
             showUpdateChecking();
             break;
-            
+
         case 'available':
             showUpdateNotification(data.version);
             break;
-            
+
         case 'not-available':
             hideUpdateNotification();
             console.log('No updates available');
             break;
-            
+
         case 'downloading':
             updateDownloadProgress(data);
             break;
-            
+
         case 'downloaded':
             showUpdateReady(data.version);
             break;
-            
+
         case 'error':
             console.error('Update error:', data.message);
             hideUpdateNotification();
@@ -1036,7 +1054,7 @@ function updateDownloadProgress(data) {
     const percent = Math.round(data.percent);
     const transferred = formatBytes(data.transferred || 0);
     const total = formatBytes(data.total || 0);
-    
+
     // Use main progress bar for launcher updates
     elements.progressContainer.style.display = 'block';
     elements.progressText.textContent = `Downloading Launcher Update (${transferred} / ${total})`;
@@ -1051,7 +1069,7 @@ function updateDownloadProgress(data) {
 function showUpdateReady(version) {
     // Hide progress bar
     elements.progressContainer.style.display = 'none';
-    
+
     // Update main action button to install update
     updateGameStatus('success', `✅ Update v${version} ready to install!`);
     updateMainActionButton('update', `🎉 Install Update v${version}`, true);
