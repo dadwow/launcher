@@ -333,6 +333,20 @@ function setupEventListeners() {
     // Wine installation progress listener
     window.electronAPI.onWineInstallProgress(handleWineInstallProgress);
 
+    // Update check progress listeners
+    window.electronAPI.onUpdateCheckStarting(() => {
+        console.log('Initial update check starting...');
+        // Disable UI and show loading state
+        updateMainActionButton('loading', '⏳ Checking for launcher updates...', false);
+        updateGameStatus('checking', 'Initializing...');
+    });
+
+    window.electronAPI.onUpdateCheckComplete(() => {
+        console.log('Initial update check complete');
+        // Re-enable UI by re-checking game status
+        checkGameStatus();
+    });
+
     // Listen for settings changes from options window
     window.addEventListener('focus', async () => {
         // Reload settings when window regains focus (after closing options)
@@ -1013,12 +1027,15 @@ window.electronAPI.onUpdateStatus((event, data) => {
 });
 
 function showUpdateChecking() {
-    elements.updateTitle.textContent = 'Checking for Updates...';
-    elements.updateMessage.textContent = 'Please wait';
-    elements.updateNotification.style.display = 'block';
-    elements.updateDownloadBtn.style.display = 'none';
-    elements.updateDismissBtn.style.display = 'none';
-    elements.updateIcon.style.animation = 'rotate 2s linear infinite';
+    // 🔇 SILENT UPDATE CHECKS - Don't show notification popup
+    // Just log to console, don't display the modal
+    console.log('Checking for updates...');
+    // elements.updateTitle.textContent = 'Checking for Updates...';
+    // elements.updateMessage.textContent = 'Please wait';
+    // elements.updateNotification.style.display = 'block';
+    // elements.updateDownloadBtn.style.display = 'none';
+    // elements.updateDismissBtn.style.display = 'none';
+    // elements.updateIcon.style.animation = 'rotate 2s linear infinite';
 }
 
 function hideUpdateNotification() {

@@ -26,11 +26,6 @@ process.env.ELECTRON_UPDATER_ALLOW_UNSIGNED = '1';
 const { autoUpdater } = require('electron-updater');
 const PlatformManager = require('./platform-manager');
 
-// 🔇 DISABLE ALL BUILT-IN NOTIFICATIONS FROM ELECTRON-UPDATER
-// This prevents the popup notifications in the bottom-right corner
-// We handle all update UI through custom renderer UI instead
-process.env.APPIMAGE = '1'; // Trick to disable notifications on all platforms
-
 // Configure autoUpdater - disable all notifications, handle UI manually
 autoUpdater.autoDownload = false; // Don't auto-download updates
 autoUpdater.autoInstallOnAppQuit = true; // Install on quit if downloaded
@@ -366,11 +361,11 @@ function createMenu() {
 // App event handlers
 app.whenReady().then(() => {
     try {
-        // Suppress any notification permissions - we don't use system notifications
+        // Register as handler for wow:// protocol URLs
         if (app.setAsDefaultProtocolClient) {
             app.setAsDefaultProtocolClient('wow');
         }
-        
+
         // Initialize platform manager
         console.log('Initializing platform manager...');
         platformManager = new PlatformManager();
@@ -381,11 +376,19 @@ app.whenReady().then(() => {
 
         // Check for updates after a short delay (2 seconds) to let the app fully load
         setTimeout(() => {
-            if (!config.devMode) {
+            if (!config.devMode && mainWindow) {
+                // Notify UI that we're checking for updates (show loading state)
+                mainWindow.webContents.send('update-check-starting');
+
                 // Silently check for updates - no notifications
                 autoUpdater.checkForUpdates().catch(err => {
                     // Suppress update check errors - don't notify user
                     console.error('Auto-updater check failed (suppressed):', err.message);
+                }).finally(() => {
+                    // Always re-enable UI after check completes (success or failure)
+                    if (mainWindow) {
+                        mainWindow.webContents.send('update-check-complete');
+                    }
                 });
             }
         }, 2000);
