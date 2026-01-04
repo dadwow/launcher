@@ -45,7 +45,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getDefaultInstallPaths: () => ipcRenderer.invoke('get-default-install-paths'),
     createWinePrefix: (prefixPath) => ipcRenderer.invoke('create-wine-prefix', prefixPath),
     getWinePrefixPath: (installPath) => ipcRenderer.invoke('get-wine-prefix-path', installPath),
-    
+
     // Automatic Wine installation
     installWineAutomatically: () => ipcRenderer.invoke('install-wine-automatically'),
     checkWineInstalling: () => ipcRenderer.invoke('check-wine-installing'),
@@ -69,12 +69,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onDownloadProgress: (callback) => ipcRenderer.on('download-progress', callback),
     onDownloadComplete: (callback) => ipcRenderer.on('download-complete', callback),
     onDownloadError: (callback) => ipcRenderer.on('download-error', callback),
-    
+
     // Event listener for extraction progress
     onExtractionProgress: (callback) => ipcRenderer.on('extraction-progress', callback),
-    
+
     // Event listeners for Wine installation progress
     onWineInstallProgress: (callback) => ipcRenderer.on('wine-install-progress', callback),
+
+    // Event listeners for initial update check
+    onUpdateCheckStarting: (callback) => ipcRenderer.on('update-check-starting', callback),
+    onUpdateCheckComplete: (callback) => ipcRenderer.on('update-check-complete', callback),
 
     // Remove event listeners
     removeAllListeners: (channel) => ipcRenderer.removeAllListeners(channel)
