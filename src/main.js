@@ -363,7 +363,7 @@ app.whenReady().then(() => {
         if (app.setAsDefaultProtocolClient) {
             app.setAsDefaultProtocolClient('wow');
         }
-        
+
         // Initialize platform manager
         console.log('Initializing platform manager...');
         platformManager = new PlatformManager();
@@ -1001,9 +1001,9 @@ async function extractZipFile(zipPath, extractPath) {
 
         // Check if extraction created a single root folder with no files
         const extractedContents = await fs.readdir(extractPath);
-        
+
         // Filter out hidden files and zip files
-        const visibleContents = extractedContents.filter(item => 
+        const visibleContents = extractedContents.filter(item =>
             !item.startsWith('.') && !item.endsWith('.zip')
         );
 
@@ -1018,14 +1018,14 @@ async function extractZipFile(zipPath, extractPath) {
                 if (stat.isDirectory()) {
                     // Check if this folder contains WoW.exe
                     const nestedContents = await fs.readdir(singleItemPath);
-                    const hasWowExe = nestedContents.some(item => 
+                    const hasWowExe = nestedContents.some(item =>
                         item.toLowerCase() === 'wow.exe'
                     );
 
                     // Only move contents up if this appears to be the WoW client folder
                     if (hasWowExe) {
                         console.log(`Found nested WoW client in folder: ${singleItem}, moving contents up...`);
-                        
+
                         // Move contents from nested folder to parent
                         for (const item of nestedContents) {
                             const oldPath = path.join(singleItemPath, item);

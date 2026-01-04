@@ -197,12 +197,38 @@ class PlatformManager {
             throw new Error('WoW.exe not found in installation directory');
         }
 
-        // Use TurtleSilicon-style launching (direct wine loader invocation without wineboot)
-        // This is more reliable and doesn't require Wine prefix creation
+        // Check for Apple Silicon - WoW 3.3.5a requires special patches
+        const isAppleSilicon = this.isMacOS && os.arch() === 'arm64';
         
+        if (isAppleSilicon) {
+            // Check if TurtleSilicon patches are applied
+            const hasTurtleSiliconPatches = await this.checkTurtleSiliconPatches(installPath, wine);
+            
+            if (!hasTurtleSiliconPatches.rosettax87 || !hasTurtleSiliconPatches.wineloader2) {
+                const missingComponents = [];
+                if (!hasTurtleSiliconPatches.rosettax87) missingComponents.push('rosettax87 service');
+                if (!hasTurtleSiliconPatches.wineloader2) missingComponents.push('patched wineloader2');
+                
+                throw new Error(
+                    `Apple Silicon Mac detected!\n\n` +
+                    `WoW 3.3.5a requires TurtleSilicon patches to run on Apple Silicon Macs.\n\n` +
+                    `Missing: ${missingComponents.join(', ')}\n\n` +
+                    `Please use TurtleSilicon to patch your installation:\n` +
+                    `1. Download from: https://github.com/Malachoris/turtlesilicon\n` +
+                    `2. Run TurtleSilicon and patch both CrossOver and your WoW installation\n` +
+                    `3. Return to this launcher to play\n\n` +
+                    `TurtleSilicon adds the rosettax87 service that prevents ILLEGAL_INSTRUCTION crashes.`
+                );
+            }
+            
+            // Launch with TurtleSilicon rosettax87 service
+            return await this.launchWithRosettaX87(installPath, hasTurtleSiliconPatches.wineloader2Path);
+        }
+
+        // Non-Apple Silicon launch (standard Wine/CrossOver)
         let winePath = wine.path;
         
-        // For CrossOver on macOS, use wineloader2 if available (TurtleSilicon patch)
+        // For CrossOver on macOS, check for wineloader2 (optional enhancement)
         if (this.isMacOS && wine.type === 'crossover') {
             const crossoverApp = wine.path.includes('CrossOver.app') 
                 ? wine.path.substring(0, wine.path.indexOf('CrossOver.app') + 'CrossOver.app'.length)
@@ -213,42 +239,30 @@ class PlatformManager {
                 'Contents/SharedSupport/CrossOver/CrossOver-Hosted Application/wineloader2'
             );
             
-            // Check if wineloader2 exists (TurtleSilicon patch applied)
             if (await fs.pathExists(wineloader2Path)) {
-                console.log('Using wineloader2 (TurtleSilicon-compatible launcher)');
+                console.log('Using wineloader2 (enhanced launcher)');
                 winePath = wineloader2Path;
-            } else {
-                console.log('wineloader2 not found, using standard CrossOver wine');
             }
         }
 
-        // Set up environment variables (TurtleSilicon-style)
+        // Set up environment variables
         const env = {
             ...process.env,
-            WINEDLLOVERRIDES: 'd3d9=n,b', // Native d3d9 override
+            WINEDLLOVERRIDES: 'd3d9=n,b',
             MVK_CONFIG_SYNCHRONOUS_QUEUE_SUBMITS: '1',
             DXVK_ASYNC: '1'
         };
 
-        // Platform-specific optimizations
         if (this.isMacOS) {
             env.DYLD_FALLBACK_LIBRARY_PATH = '/usr/lib';
-            env.MTL_HUD_ENABLED = '0'; // Disable Metal HUD for performance
-            
-            // Apple Silicon specific optimizations
-            if (os.arch() === 'arm64') {
-                env.DYLD_LIBRARY_PATH = '/opt/homebrew/lib';
-                env.WINE_LARGE_ADDRESS_AWARE = '1';
-            }
+            env.MTL_HUD_ENABLED = '0';
         } else if (this.isLinux) {
-            // Linux-specific optimizations
-            env.WINEDEBUG = '-all'; // Disable debug output for performance
+            env.WINEDEBUG = '-all';
             env.__GL_SHADER_DISK_CACHE = '1';
             env.__GL_THREADED_OPTIMIZATIONS = '1';
         }
 
         try {
-            // Launch WoW directly without Wine prefix (TurtleSilicon approach)
             const wowProcess = spawn(winePath, [wowExePath], {
                 cwd: installPath,
                 env: env,
@@ -257,15 +271,85 @@ class PlatformManager {
             });
 
             wowProcess.unref();
-            
-            console.log(`WoW launched successfully using ${wine.type} (${winePath})`);
+            console.log(`WoW launched using ${wine.type}`);
             return { success: true, process: wowProcess };
         } catch (error) {
             throw new Error(`Failed to launch WoW with Wine: ${error.message}`);
         }
     }
 
-    // Check for platform-specific WoW client compatibility
+    // Check if TurtleSilicon patches are applied (required for Apple Silicon)
+    async checkTurtleSiliconPatches(installPath, wine) {
+        const result = {
+            rosettax87: false,
+            wineloader2: false,
+            wineloader2Path: null,
+            rosettax87Path: null
+        };
+
+        // Check for rosettax87 service in WoW directory
+        const rosettax87Dir = path.join(installPath, 'rosettax87');
+        const rosettax87Exe = path.join(rosettax87Dir, 'rosettax87');
+        
+        if (await fs.pathExists(rosettax87Exe)) {
+            result.rosettax87 = true;
+            result.rosettax87Path = rosettax87Exe;
+        }
+
+        // Check for wineloader2 (patched CrossOver)
+        if (wine.type === 'crossover') {
+            const crossoverApp = wine.path.includes('CrossOver.app') 
+                ? wine.path.substring(0, wine.path.indexOf('CrossOver.app') + 'CrossOver.app'.length)
+                : '/Applications/CrossOver.app';
+                
+            const wineloader2Path = path.join(
+                crossoverApp,
+                'Contents/SharedSupport/CrossOver/CrossOver-Hosted Application/wineloader2'
+            );
+            
+            if (await fs.pathExists(wineloader2Path)) {
+                result.wineloader2 = true;
+                result.wineloader2Path = wineloader2Path;
+            }
+        }
+
+        return result;
+    }
+
+    // Launch WoW with rosettax87 service (TurtleSilicon method for Apple Silicon)
+    async launchWithRosettaX87(installPath, wineloader2Path) {
+        const wowExePath = path.join(installPath, 'WoW.exe');
+        const rosettax87Exe = path.join(installPath, 'rosettax87', 'rosettax87');
+
+        // Set up environment with TurtleSilicon optimizations
+        const env = {
+            ...process.env,
+            WINEDLLOVERRIDES: 'd3d9=n,b',
+            MTL_HUD_ENABLED: '0',
+            MVK_CONFIG_SYNCHRONOUS_QUEUE_SUBMITS: '1',
+            DXVK_ASYNC: '1',
+            DYLD_LIBRARY_PATH: '/opt/homebrew/lib',
+            DYLD_FALLBACK_LIBRARY_PATH: '/usr/lib',
+            WINE_LARGE_ADDRESS_AWARE: '1'
+        };
+
+        try {
+            // Launch using rosettax87 service with wineloader2
+            // Command: cd <installPath> && <rosettax87> <wineloader2> <WoW.exe>
+            const wowProcess = spawn(rosettax87Exe, [wineloader2Path, wowExePath], {
+                cwd: installPath,
+                env: env,
+                detached: true,
+                stdio: 'ignore'
+            });
+
+            wowProcess.unref();
+            console.log('WoW launched with rosettax87 service (Apple Silicon optimized)');
+            return { success: true, process: wowProcess };
+        } catch (error) {
+            throw new Error(`Failed to launch WoW with rosettax87: ${error.message}`);
+        }
+    }    // Check for platform-specific WoW client compatibility
     async validateWoWInstallation(installPath) {
         const wowExePath = path.join(installPath, 'WoW.exe');
         const dataPath = path.join(installPath, 'Data');
@@ -296,11 +380,31 @@ class PlatformManager {
             );
         }
 
+        // Apple Silicon specific checks
+        const isAppleSilicon = this.isMacOS && os.arch() === 'arm64';
+        let turtleSiliconPatches = null;
+        
+        if (isAppleSilicon && wine.installed) {
+            turtleSiliconPatches = await this.checkTurtleSiliconPatches(installPath, wine);
+            
+            if (!turtleSiliconPatches.rosettax87) {
+                requirements.push('TurtleSilicon rosettax87 service required for Apple Silicon');
+            }
+            if (!turtleSiliconPatches.wineloader2) {
+                requirements.push('TurtleSilicon patched wineloader2 required for Apple Silicon');
+            }
+        }
+
+        const allRequirementsMet = wine.installed && 
+            (!isAppleSilicon || (turtleSiliconPatches?.rosettax87 && turtleSiliconPatches?.wineloader2));
+
         return {
             ...baseCheck,
-            isValid: baseCheck.hasExecutable && baseCheck.hasData && wine.installed,
+            isValid: baseCheck.hasExecutable && baseCheck.hasData && allRequirementsMet,
             platform: `${this.getPlatformName()} (Compatibility Layer)`,
             wineInfo: wine,
+            turtleSiliconPatches: turtleSiliconPatches,
+            isAppleSilicon: isAppleSilicon,
             requirements: requirements
         };
     }
@@ -313,7 +417,7 @@ class PlatformManager {
         }
 
         this._wineInstalling = true;
-        
+
         if (progressCallback) progressCallback('Installing Windows compatibility layer...', 0);
 
         try {
@@ -325,7 +429,7 @@ class PlatformManager {
             } else {
                 result = { success: false, message: 'Unsupported platform for automatic installation' };
             }
-            
+
             this._wineInstalling = false;
             return result;
         } catch (error) {
@@ -344,7 +448,7 @@ class PlatformManager {
         try {
             // Check if Homebrew is installed
             if (progressCallback) progressCallback('Checking system requirements...', 10);
-            
+
             let hasHomebrew = false;
             try {
                 await execAsync('which brew');
@@ -352,8 +456,8 @@ class PlatformManager {
             } catch (error) {
                 // Homebrew not found, install it
                 if (progressCallback) progressCallback('Installing package manager...', 20);
-                
-                const installHomebrew = spawn('/bin/bash', ['-c', 
+
+                const installHomebrew = spawn('/bin/bash', ['-c',
                     '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
                 ], { stdio: 'pipe' });
 
@@ -395,7 +499,7 @@ class PlatformManager {
     async installWineOnLinux(progressCallback = null) {
         try {
             const packageManager = await this.detectLinuxPackageManager();
-            
+
             if (progressCallback) progressCallback(`Installing compatibility layer via ${packageManager}...`, 30);
 
             let installCommand;
@@ -474,7 +578,7 @@ class PlatformManager {
     // Install Lutris on Linux for better Wine gaming support
     async installLutrisOnLinux(packageManager) {
         let installCommand;
-        
+
         switch (packageManager) {
             case 'apt':
                 installCommand = 'sudo apt install -y lutris';
@@ -509,13 +613,13 @@ class PlatformManager {
         if (this.isMacOS) {
             return {
                 title: isAppleSilicon ? 'CrossOver Recommended for Apple Silicon' : 'Wine Installation Options for macOS',
-                note: isAppleSilicon 
+                note: isAppleSilicon
                     ? 'CrossOver is highly recommended for Apple Silicon Macs for optimal WoW 3.3.5a performance with native ARM64 support.'
                     : 'Automatic installation is recommended. Use these steps only if automatic installation fails.',
                 methods: [
                     {
                         name: 'CrossOver (Recommended' + (isAppleSilicon ? ' - Apple Silicon Optimized' : '') + ')',
-                        description: isAppleSilicon 
+                        description: isAppleSilicon
                             ? 'Professional Wine distribution with native Apple Silicon support and libsillicon optimizations'
                             : 'Professional Wine distribution with excellent WoW support',
                         url: 'https://www.codeweavers.com/crossover',
@@ -565,7 +669,7 @@ class PlatformManager {
         }
 
         const isAppleSilicon = this.arch === 'arm64';
-        
+
         try {
             if (progressCallback) {
                 progressCallback('Checking macOS configuration...', 10);
@@ -625,22 +729,22 @@ class PlatformManager {
     async applyLibSiliconPatch(installPath, progressCallback = null) {
         try {
             const wineInfo = await this.checkWineInstallation();
-            
+
             if (wineInfo.type === 'crossover') {
                 if (progressCallback) {
                     progressCallback('CrossOver detected - libsillicon support enabled', 50);
                 }
-                
+
                 const configPath = path.join(installPath, 'WTF', 'Config.wtf');
                 await fs.ensureDir(path.dirname(configPath));
-                
+
                 const recommendedSettings = [
                     'SET gxApi "OpenGL"',
                     'SET M2Faster "3"',
                     'SET maxFPS "60"',
                     'SET hwDetect "0"'
                 ].join('\\n');
-                
+
                 if (await fs.pathExists(configPath)) {
                     const existingConfig = await fs.readFile(configPath, 'utf8');
                     if (!existingConfig.includes('gxApi')) {
@@ -649,7 +753,7 @@ class PlatformManager {
                 } else {
                     await fs.writeFile(configPath, recommendedSettings + '\\n', 'utf8');
                 }
-                
+
                 return {
                     success: true,
                     message: 'CrossOver with libsillicon configured'
@@ -661,7 +765,7 @@ class PlatformManager {
                     error: 'CrossOver recommended for optimal Apple Silicon support'
                 };
             }
-            
+
         } catch (error) {
             return {
                 success: false,

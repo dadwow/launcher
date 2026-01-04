@@ -29,12 +29,29 @@ The launcher was trying to launch WoW using `wineboot` to create Wine prefixes, 
 Error: Failed to launch WoW: Command failed: WINEPREFIX="/Users/user/.wine-wow" /path/to/wine wineboot
 ```
 
+### Additional Critical Issue - Apple Silicon
+On Apple Silicon Macs (M1/M2/M3/M4), WoW 3.3.5a crashes with:
+```
+ERROR #132 (0x85100084) Fatal Exception
+Exception: 0xC000001D (ILLEGAL_INSTRUCTION)
+```
+
+This is because WoW 3.3.5a uses x87 FPU instructions that are not natively supported on ARM64 architecture.
+
 ### Solution
-Adopted the TurtleSilicon approach which:
-- Launches WoW **directly** using `wineloader` or `wineloader2` (CrossOver)
-- **Does NOT** create Wine prefixes (not required)
-- Uses proper environment variables for optimal performance
-- Supports native Apple Silicon optimization
+Adopted the TurtleSilicon approach with **mandatory Apple Silicon support**:
+
+**For Apple Silicon Macs:**
+- ✅ **REQUIRES** TurtleSilicon patches to run WoW 3.3.5a
+- ✅ Detects rosettax87 service (prevents ILLEGAL_INSTRUCTION crashes)
+- ✅ Detects wineloader2 (patched CrossOver)
+- ✅ Launches with proper rosettax87 integration
+- ⚠️ **Will not launch** without TurtleSilicon patches (prevents crashes)
+
+**For Intel Macs & Linux:**
+- Launches directly with Wine/CrossOver (no special patches needed)
+- Uses optimized environment variables
+- Optional wineloader2 detection for enhanced performance
 
 ### Key Improvements
 
@@ -115,17 +132,41 @@ Adopted the TurtleSilicon approach which:
    - Verify WoW.exe is correctly moved to installation root
    - Check logs for "Found nested WoW client" message
 
-2. **Test CrossOver launching on macOS:**
+2. **Test CrossOver launching on Intel Macs:**
    - Ensure CrossOver is installed
    - Point to WoW client installation
    - Click "Launch World of Warcraft"
    - Verify no "wineboot" errors
-   - Check if wineloader2 is detected (if TurtleSilicon patches applied)
 
-3. **Test on Apple Silicon (if available):**
-   - Verify Apple Silicon optimizations are applied
-   - Check environment variables in logs
-   - Confirm performance improvements
+3. **Test on Apple Silicon (M1/M2/M3/M4):**
+   - **REQUIRED:** Install TurtleSilicon first: https://github.com/Malachoris/turtlesilicon
+   - Use TurtleSilicon to patch both CrossOver and WoW installation
+   - Return to this launcher
+   - Launcher will detect TurtleSilicon patches automatically
+   - If patches missing, helpful error message with instructions will appear
+   - Once patched, game launches with rosettax87 service (no crashes)
+
+## Important Notes for Apple Silicon Users
+
+### Why TurtleSilicon is Required
+WoW 3.3.5a uses x87 FPU instructions that cause `ILLEGAL_INSTRUCTION` errors on ARM64. TurtleSilicon's `rosettax87` service intercepts and translates these instructions in real-time, preventing crashes.
+
+### Setup Steps
+1. Download TurtleSilicon: https://github.com/Malachoris/turtlesilicon/releases
+2. Open TurtleSilicon
+3. Set CrossOver path (usually `/Applications/CrossOver.app`)
+4. Set WoW installation path
+5. Click "Patch CrossOver" (creates wineloader2)
+6. Click "Patch WoW" (installs rosettax87 service)
+7. Close TurtleSilicon
+8. Use this launcher - it will detect patches and launch correctly
+
+### What This Launcher Does
+- ✅ Detects if you're on Apple Silicon
+- ✅ Checks for required TurtleSilicon patches
+- ✅ Shows helpful error with setup instructions if patches missing
+- ✅ Launches with rosettax87 if patches detected
+- ✅ Validates installation before allowing launch
 
 ## Backwards Compatibility
 
