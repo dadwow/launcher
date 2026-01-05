@@ -886,10 +886,6 @@ function showToast(message, type = 'info', duration = 4000) {
     console.log(`${type.toUpperCase()}: ${message}`);
 }
 
-function showStatusMessage(button, message, type = 'info', duration = 3000) {
-    // Not used anymore - feedback shown on button
-}
-
 function setButtonState(buttonId, state, message = '', duration = 3000) {
     if (message) {
         setButtonFeedback(buttonId, message, state, duration);
