@@ -25,6 +25,21 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Verify Husky installation
+        run: |
+          if [ ! -d ".husky" ]; then
+            echo "⚠️ Husky hooks directory not found. Running prepare script..."
+            npm run prepare
+            if [ -d ".husky" ]; then
+              echo "✅ Husky hooks initialized successfully"
+            else
+              echo "❌ Failed to initialize Husky hooks"
+              exit 1
+            fi
+          else
+            echo "✅ Husky hooks already initialized"
+          fi
+
       - name: Run ESLint
         run: npm run lint
         continue-on-error: false
