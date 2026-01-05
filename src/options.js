@@ -1,7 +1,9 @@
+/* global confirm */
+
 // Setup window controls for frameless window
 document.addEventListener('DOMContentLoaded', () => {
     const closeBtn = document.getElementById('close-btn');
-    
+
     if (closeBtn) {
         closeBtn.addEventListener('click', () => {
             // Check if we're in an iframe (modal) or separate window
@@ -21,7 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Listen for data from parent window (when in iframe modal)
-window.addEventListener('message', (event) => {
+window.addEventListener('message', event => {
     console.log('Iframe received message:', event.data);
     if (event.data.type === 'initializeWithData') {
         // Initialize the options with the data passed from parent
@@ -36,14 +38,17 @@ window.addEventListener('message', (event) => {
 const electronAPI = {
     // Check if we're in an iframe
     isInIframe: () => window.parent !== window,
-    
+
     // Generic proxy for all electronAPI methods
     call: (method, ...args) => {
         if (electronAPI.isInIframe()) {
             return new Promise((resolve, reject) => {
                 const requestId = Math.random().toString(36).substr(2, 9);
-                const messageListener = (event) => {
-                    if (event.data.type === 'electronAPI-response' && event.data.requestId === requestId) {
+                const messageListener = event => {
+                    if (
+                        event.data.type === 'electronAPI-response' &&
+                        event.data.requestId === requestId
+                    ) {
                         window.removeEventListener('message', messageListener);
                         if (event.data.error) {
                             reject(new Error(event.data.error));
@@ -53,12 +58,15 @@ const electronAPI = {
                     }
                 };
                 window.addEventListener('message', messageListener);
-                window.parent.postMessage({
-                    type: 'electronAPI-request',
-                    requestId: requestId,
-                    method: method,
-                    args: args
-                }, '*');
+                window.parent.postMessage(
+                    {
+                        type: 'electronAPI-request',
+                        requestId: requestId,
+                        method: method,
+                        args: args
+                    },
+                    '*'
+                );
             });
         }
         return window.electronAPI[method](...args);
@@ -66,7 +74,7 @@ const electronAPI = {
 };
 
 // Options window state
-let optionsState = {
+const optionsState = {
     config: null,
     platform: null,
     settings: {},
@@ -94,7 +102,7 @@ const elements = {
     platformStatus: document.getElementById('platform-status'),
     platformText: document.getElementById('platform-text'),
 
-    // Server tab  
+    // Server tab
     realmAddressInput: document.getElementById('realm-address'),
     testRealmConnection: document.getElementById('test-connection'),
     connectionStatus: document.getElementById('connection-status'),
@@ -140,8 +148,6 @@ async function initializeOptions() {
 // Initialize with data passed from parent window
 async function initializeWithData(config, settings) {
     try {
-
-        
         // Set the data that would normally come from electronAPI
         optionsState.config = config;
         optionsState.platform = config.platform;
@@ -174,10 +180,9 @@ async function initializeWithData(config, settings) {
 // Set up event listeners
 function setupEventListeners() {
     try {
-
         // Tab switching
         elements.tabButtons.forEach(button => {
-            button.addEventListener('click', (e) => {
+            button.addEventListener('click', e => {
                 switchTab(button.dataset.tab);
             });
         });
@@ -197,7 +202,7 @@ function setupEventListeners() {
         }
 
         if (elements.realmAddressInput) {
-            elements.realmAddressInput.addEventListener('input', (e) => {
+            elements.realmAddressInput.addEventListener('input', e => {
                 optionsState.realmAddress = e.target.value;
             });
         }
@@ -208,7 +213,7 @@ function setupEventListeners() {
         }
 
         if (elements.githubRepoUrl) {
-            elements.githubRepoUrl.addEventListener('keypress', (e) => {
+            elements.githubRepoUrl.addEventListener('keypress', e => {
                 if (e.key === 'Enter') {
                     installAddonFromGitHub();
                 }
@@ -242,7 +247,6 @@ function setupEventListeners() {
 
 // Tab switching functionality
 function switchTab(tabName) {
-
     // Update buttons
     elements.tabButtons.forEach(button => {
         const isActive = button.dataset.tab === tabName;
@@ -269,10 +273,10 @@ async function browseForInstallPath() {
                 elements.installPathInput.value = selectedPath;
             }
             await checkInstallation();
-            
+
             // Rescan addons with new install path
             await loadInstalledAddons();
-            
+
             showToast('Installation path updated', 'success');
         }
     } catch (error) {
@@ -286,7 +290,7 @@ async function browseForInstallPath() {
 // Check WoW installation
 async function checkInstallation() {
     setButtonLoading('check-installation', true);
-    
+
     if (!optionsState.installPath) {
         setButtonLoading('check-installation', false);
         updateInstallationStatus('warning', 'Please select an installation directory.');
@@ -294,7 +298,10 @@ async function checkInstallation() {
     }
 
     try {
-        const installationCheck = await proxyElectronAPICall('checkWowInstallation', optionsState.installPath);
+        const installationCheck = await proxyElectronAPICall(
+            'checkWowInstallation',
+            optionsState.installPath
+        );
 
         if (installationCheck.isValid) {
             updateInstallationStatus('success', 'WoW client found and ready to launch.');
@@ -312,9 +319,9 @@ async function checkInstallation() {
 // Test realm connection
 async function testRealmConnection() {
     setButtonLoading('test-connection', true);
-    
+
     const realmAddress = optionsState.realmAddress || optionsState.config?.defaultRealm;
-    
+
     if (!realmAddress) {
         setButtonLoading('test-connection', false);
         updateConnectionStatus('error', 'Please enter a realm address');
@@ -344,12 +351,12 @@ async function testRealmConnection() {
 async function installAddonFromGitHub() {
     const repoUrl = elements.githubRepoUrl?.value;
     const installBtn = document.getElementById('install-addon-btn');
-    
+
     if (!repoUrl) {
         setButtonState('install-addon-btn', 'error', 'Please enter a GitHub repository URL');
         return;
     }
-    
+
     // Get install path
     const installPath = optionsState.settings.installPath || optionsState.config?.installPath;
     if (!installPath) {
@@ -359,33 +366,45 @@ async function installAddonFromGitHub() {
 
     try {
         setButtonLoading('install-addon-btn', true);
-        
+
         // Parse GitHub URL to get owner and repo
-        const urlMatch = repoUrl.match(/github\.com\/([^\/]+)\/([^\/]+)/);
+        const urlMatch = repoUrl.match(/github\.com\/([^/]+)\/([^/]+)/);
         if (!urlMatch) {
             setButtonState('install-addon-btn', 'error', 'Invalid GitHub repository URL');
             return;
         }
-        
+
         const [, owner, repo] = urlMatch;
         const cleanRepo = repo.replace(/\.git$/, '');
-        
+
         console.log(`Installing addon from ${owner}/${cleanRepo}`);
-        
-        const result = await proxyElectronAPICall('installAddonFromGitHub', owner, cleanRepo, installPath);
-        
+
+        const result = await proxyElectronAPICall(
+            'installAddonFromGitHub',
+            owner,
+            cleanRepo,
+            installPath
+        );
+
         if (result.success) {
             setButtonState('install-addon-btn', 'success', 'Addon installed successfully!');
             elements.githubRepoUrl.value = '';
             // Reload addon list
             await loadInstalledAddons();
         } else {
-            setButtonState('install-addon-btn', 'error', `Failed to install: ${result.error || 'Unknown error'}`);
+            setButtonState(
+                'install-addon-btn',
+                'error',
+                `Failed to install: ${result.error || 'Unknown error'}`
+            );
         }
-        
     } catch (error) {
         console.error('Error installing addon:', error);
-        setButtonState('install-addon-btn', 'error', 'Installation failed: ' + (error.message || error));
+        setButtonState(
+            'install-addon-btn',
+            'error',
+            'Installation failed: ' + (error.message || error)
+        );
     }
 }
 
@@ -393,7 +412,7 @@ async function installAddonFromGitHub() {
 async function saveOptions() {
     try {
         setButtonLoading('save-options', true);
-        
+
         const settings = {
             installPath: elements.installPathInput?.value || optionsState.installPath,
             realmAddress: elements.realmAddressInput?.value || optionsState.realmAddress,
@@ -405,7 +424,7 @@ async function saveOptions() {
         };
 
         await proxyElectronAPICall('saveSettings', settings);
-        
+
         setButtonFeedback('save-options', 'Saved!', 'success', 1500);
 
         // Close modal after feedback
@@ -416,7 +435,6 @@ async function saveOptions() {
                 window.close();
             }
         }, 1500);
-
     } catch (error) {
         console.error('Error saving settings:', error);
         setButtonFeedback('save-options', 'Save Failed', 'error', 2000);
@@ -427,13 +445,15 @@ async function saveOptions() {
 function resetToDefaults() {
     // Reset form values directly without confirmation
     if (elements.installPathInput) elements.installPathInput.value = '';
-    if (elements.realmAddressInput) elements.realmAddressInput.value = optionsState.config?.defaultRealm || '';
-    if (elements.downloadUrlInput) elements.downloadUrlInput.value = optionsState.config?.downloadUrl || '';
+    if (elements.realmAddressInput)
+        elements.realmAddressInput.value = optionsState.config?.defaultRealm || '';
+    if (elements.downloadUrlInput)
+        elements.downloadUrlInput.value = optionsState.config?.downloadUrl || '';
     if (elements.autoUpdateRealmlist) elements.autoUpdateRealmlist.checked = true;
     if (elements.closeOnLaunch) elements.closeOnLaunch.checked = false;
     if (elements.enableLogging) elements.enableLogging.checked = false;
     if (elements.addonBackup) elements.addonBackup.checked = true;
-    
+
     setButtonState('reset-options', 'success', 'Settings reset to defaults');
 }
 
@@ -442,11 +462,12 @@ function populateForm() {
     try {
         console.log('Populating form with settings:', optionsState.settings);
         console.log('Config data:', JSON.stringify(optionsState.config, null, 2));
-        
+
         // Install path - use saved setting, or config installPath, or platform default
         if (elements.installPathInput) {
-            let installPath = optionsState.settings.installPath || optionsState.config?.installPath || '';
-            
+            let installPath =
+                optionsState.settings.installPath || optionsState.config?.installPath || '';
+
             // If no install path set, use platform defaults
             if (!installPath) {
                 if (optionsState.platform?.isWindows) {
@@ -456,34 +477,37 @@ function populateForm() {
                     installPath = `${process.env.HOME || '/home/' + (process.env.USER || 'user')}/Documents/World of Warcraft`;
                 }
             }
-            
+
             elements.installPathInput.value = installPath;
             optionsState.installPath = installPath;
         }
 
         if (elements.realmAddressInput) {
             // Use saved setting, or config defaultRealm, or hardcoded fallback from .env
-            const realmAddress = optionsState.settings.realmAddress || 
-                               optionsState.config?.defaultRealm || 
-                               'play.ascend-digital.co.uk'; // fallback to .env default
-            
+            const realmAddress =
+                optionsState.settings.realmAddress ||
+                optionsState.config?.defaultRealm ||
+                'play.ascend-digital.co.uk'; // fallback to .env default
+
             console.log('Realm address sources:', {
                 saved: optionsState.settings.realmAddress,
                 configDefault: optionsState.config?.defaultRealm,
                 configFull: optionsState.config,
                 final: realmAddress
             });
-            
+
             elements.realmAddressInput.value = realmAddress;
             optionsState.realmAddress = realmAddress;
         }
 
         if (elements.downloadUrlInput) {
-            elements.downloadUrlInput.value = optionsState.settings.downloadUrl || optionsState.config?.downloadUrl || '';
+            elements.downloadUrlInput.value =
+                optionsState.settings.downloadUrl || optionsState.config?.downloadUrl || '';
         }
 
         if (elements.autoUpdateRealmlist) {
-            elements.autoUpdateRealmlist.checked = optionsState.settings.autoUpdateRealmlist !== false;
+            elements.autoUpdateRealmlist.checked =
+                optionsState.settings.autoUpdateRealmlist !== false;
         }
 
         if (elements.closeOnLaunch) {
@@ -511,12 +535,16 @@ function updatePlatformInfo() {
     try {
         elements.platformInfo.style.display = 'block';
 
-        const icon = optionsState.platform.isWindows ? '🪟' :
-            optionsState.platform.isMacOS ? '🍎' :
-                optionsState.platform.isLinux ? '🐧' : '💻';
+        const icon = optionsState.platform.isWindows
+            ? '🪟'
+            : optionsState.platform.isMacOS
+              ? '🍎'
+              : optionsState.platform.isLinux
+                ? '🐧'
+                : '💻';
 
         const platformText = `${icon} ${optionsState.platform.platformName} (${optionsState.platform.arch})`;
-        
+
         if (elements.platformText) {
             elements.platformText.textContent = platformText;
         }
@@ -538,8 +566,8 @@ async function proxyElectronAPICall(method, ...args) {
         // If we're in an iframe, use postMessage to communicate with parent
         if (window.parent && window.parent !== window) {
             const id = Date.now() + Math.random();
-            
-            const messageHandler = (event) => {
+
+            const messageHandler = event => {
                 if (event.data.type === 'electronAPIResponse' && event.data.id === id) {
                     window.removeEventListener('message', messageHandler);
                     if (event.data.error) {
@@ -549,16 +577,19 @@ async function proxyElectronAPICall(method, ...args) {
                     }
                 }
             };
-            
+
             window.addEventListener('message', messageHandler);
-            
-            window.parent.postMessage({
-                type: 'electronAPICall',
-                id: id,
-                method: method,
-                args: args
-            }, '*');
-            
+
+            window.parent.postMessage(
+                {
+                    type: 'electronAPICall',
+                    id: id,
+                    method: method,
+                    args: args
+                },
+                '*'
+            );
+
             // Timeout after 10 seconds
             setTimeout(() => {
                 window.removeEventListener('message', messageHandler);
@@ -578,16 +609,16 @@ async function proxyElectronAPICall(method, ...args) {
 // Function to check wine status
 async function checkWineStatus() {
     if (!optionsState.platform || !optionsState.platform.needsWine) return;
-    
+
     try {
         const wineStatusDiv = document.getElementById('wine-status');
         if (!wineStatusDiv) return;
 
         wineStatusDiv.innerHTML = '<div class="checking">Checking wine installation...</div>';
-        
+
         // Use the proxy system to check wine installation
         const wineStatus = await proxyElectronAPICall('checkWineInstallation');
-        
+
         if (wineStatus && wineStatus.installed) {
             wineStatusDiv.innerHTML = `
                 <div class="wine-installed">
@@ -621,9 +652,8 @@ async function checkWineStatus() {
 function updateInstallationStatus(type, message) {
     if (!elements.installationStatusOptions) return;
 
-    const statusClass = type === 'success' ? 'success' : 
-                       type === 'warning' ? 'warning' : 'error';
-    
+    const statusClass = type === 'success' ? 'success' : type === 'warning' ? 'warning' : 'error';
+
     elements.installationStatusOptions.className = `installation-status ${statusClass}`;
     elements.installationStatusOptions.textContent = message;
 }
@@ -632,9 +662,8 @@ function updateInstallationStatus(type, message) {
 function updateConnectionStatus(type, message) {
     if (!elements.connectionStatus) return;
 
-    const statusClass = type === 'success' ? 'success' : 
-                       type === 'testing' ? 'info' : 'error';
-    
+    const statusClass = type === 'success' ? 'success' : type === 'testing' ? 'info' : 'error';
+
     elements.connectionStatus.className = `connection-status ${statusClass}`;
     elements.connectionStatus.textContent = message;
 }
@@ -649,7 +678,7 @@ function showStatusMessage(message, type = 'info') {
 async function loadInstalledAddons() {
     try {
         console.log('Loading installed addons...');
-        
+
         // Get install path from settings or config
         const installPath = optionsState.settings.installPath || optionsState.config?.installPath;
         if (!installPath) {
@@ -667,16 +696,16 @@ async function loadInstalledAddons() {
             }
             return;
         }
-        
+
         const addons = await proxyElectronAPICall('getInstalledAddons', installPath);
         console.log('Loaded addons:', addons);
-        
+
         const addonList = document.getElementById('addon-list');
         if (!addonList) {
             console.warn('Addon list element not found');
             return;
         }
-        
+
         if (!addons || addons.length === 0) {
             addonList.innerHTML = `
                 <div class="addon-item">
@@ -688,9 +717,11 @@ async function loadInstalledAddons() {
             `;
             return;
         }
-        
+
         // Display installed addons
-        addonList.innerHTML = addons.map(addon => `
+        addonList.innerHTML = addons
+            .map(
+                addon => `
             <div class="addon-item">
                 <div class="addon-info">
                     <div class="addon-name">${addon.name || 'Unknown Addon'}</div>
@@ -702,11 +733,12 @@ async function loadInstalledAddons() {
                     <button class="btn btn-danger btn-sm" onclick="uninstallAddon('${addon.name}')"><span class="btn-text">Remove</span></button>
                 </div>
             </div>
-        `).join('');
-        
+        `
+            )
+            .join('');
+
         // Store loaded addons in state
         optionsState.installedAddons = addons;
-        
     } catch (error) {
         console.error('Failed to load installed addons:', error);
         const addonList = document.getElementById('addon-list');
@@ -731,7 +763,7 @@ async function uninstallAddon(addonName) {
             showToast('Install path not available', 'error');
             return;
         }
-        
+
         // Find the remove button for this addon and set loading state
         const addonItems = document.querySelectorAll('.addon-item');
         let removeBtn = null;
@@ -742,25 +774,24 @@ async function uninstallAddon(addonName) {
                 break;
             }
         }
-        
+
         if (removeBtn) {
             removeBtn.classList.add('btn-loading');
             removeBtn.disabled = true;
         }
-        
+
         await proxyElectronAPICall('uninstall-addon', addonName, installPath);
-        
+
         showToast(`${addonName} has been uninstalled successfully`, 'success');
-        
+
         // Reload addon list after a short delay
         setTimeout(async () => {
             await loadInstalledAddons();
         }, 500);
-        
     } catch (error) {
         console.error('Failed to uninstall addon:', error);
         showToast(`Failed to uninstall ${addonName}: ${error.message || 'Unknown error'}`, 'error');
-        
+
         // Find and reset the button state
         const addonItems = document.querySelectorAll('.addon-item');
         for (const item of addonItems) {
@@ -780,13 +811,13 @@ async function uninstallAddon(addonName) {
 // Check for addon updates
 async function checkForUpdates() {
     const updateBtn = document.querySelector('button[onclick="checkForUpdates()"]');
-    
+
     try {
         if (updateBtn) {
             updateBtn.classList.add('btn-loading');
             updateBtn.disabled = true;
         }
-        
+
         // Get installed addons first
         const installPath = optionsState.settings.installPath || optionsState.config?.installPath;
         if (!installPath) {
@@ -797,7 +828,7 @@ async function checkForUpdates() {
             }
             return;
         }
-        
+
         const addons = optionsState.installedAddons || [];
         if (addons.length === 0) {
             if (updateBtn) {
@@ -807,15 +838,19 @@ async function checkForUpdates() {
             }
             return;
         }
-        
+
         const result = await proxyElectronAPICall('checkAddonUpdates', addons);
-        
+
         if (updateBtn) {
             updateBtn.classList.remove('btn-loading');
             updateBtn.disabled = false;
-            
+
             if (result && result.length > 0) {
-                showStatusMessage(updateBtn, `Found ${result.length} update(s) available!`, 'success');
+                showStatusMessage(
+                    updateBtn,
+                    `Found ${result.length} update(s) available!`,
+                    'success'
+                );
             } else {
                 showStatusMessage(updateBtn, 'All addons are up to date!', 'success');
             }
@@ -855,21 +890,21 @@ function setButtonFeedback(buttonId, message, type = 'success', duration = 2000)
 
     // Remove loading state first
     setButtonLoading(buttonId, false);
-    
+
     const textSpan = button.querySelector('.btn-text');
     if (textSpan) {
         // Store original text if not already stored
         if (!button.dataset.originalText) {
             button.dataset.originalText = textSpan.textContent;
         }
-        
+
         // Show feedback message
         textSpan.textContent = message;
-        
+
         // Add visual feedback class
         button.classList.remove('btn-feedback-success', 'btn-feedback-error');
         button.classList.add(`btn-feedback-${type}`);
-        
+
         // Restore original text after delay
         setTimeout(() => {
             if (button.dataset.originalText) {
@@ -884,10 +919,6 @@ function setButtonFeedback(buttonId, message, type = 'success', duration = 2000)
 // Simplified functions for compatibility
 function showToast(message, type = 'info', duration = 4000) {
     console.log(`${type.toUpperCase()}: ${message}`);
-}
-
-function showStatusMessage(button, message, type = 'info', duration = 3000) {
-    // Not used anymore - feedback shown on button
 }
 
 function setButtonState(buttonId, state, message = '', duration = 3000) {
@@ -921,7 +952,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Add to global scope for inline onclick handlers
-window.uninstallAddon = async function(addonName) {
+window.uninstallAddon = async function (addonName) {
     if (confirm(`Are you sure you want to uninstall ${addonName}?`)) {
         console.log(`Uninstalling addon: ${addonName}`);
         await uninstallAddon(addonName);

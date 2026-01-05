@@ -11,7 +11,7 @@ jest.mock('fs-extra');
 describe('Addon Scanning Tests', () => {
     beforeEach(() => {
         jest.clearAllMocks();
-        
+
         fs.pathExists = jest.fn();
         fs.readdir = jest.fn();
         fs.stat = jest.fn();
@@ -25,25 +25,29 @@ describe('Addon Scanning Tests', () => {
         fs.pathExists.mockResolvedValue(true);
         fs.readdir.mockResolvedValue(['ElvUI', 'DBM-Core', 'Recount']);
         fs.stat.mockResolvedValue({ isDirectory: () => true });
-        
+
         // Mock .toc file reading
-        fs.readFile.mockImplementation((filePath) => {
+        fs.readFile.mockImplementation(filePath => {
             if (filePath.includes('ElvUI.toc')) {
-                return Promise.resolve('## Title: ElvUI\n## Version: 13.00\n## Notes: UI replacement');
+                return Promise.resolve(
+                    '## Title: ElvUI\n## Version: 13.00\n## Notes: UI replacement'
+                );
             }
             if (filePath.includes('DBM-Core.toc')) {
                 return Promise.resolve('## Title: DBM-Core\n## Version: 10.0\n## Notes: Boss mod');
             }
             if (filePath.includes('Recount.toc')) {
-                return Promise.resolve('## Title: Recount\n## Version: 1.0\n## Notes: Damage meter');
+                return Promise.resolve(
+                    '## Title: Recount\n## Version: 1.0\n## Notes: Damage meter'
+                );
             }
             return Promise.reject(new Error('File not found'));
         });
 
-        const getInstalledAddons = async (installPath) => {
+        const getInstalledAddons = async installPath => {
             const addonPath = path.join(installPath, 'Interface', 'AddOns');
 
-            if (!await fs.pathExists(addonPath)) {
+            if (!(await fs.pathExists(addonPath))) {
                 return [];
             }
 
@@ -65,14 +69,14 @@ describe('Addon Scanning Tests', () => {
 
                     // Try to read .toc file
                     const tocFiles = [folder + '.toc'];
-                    
+
                     for (const tocFile of tocFiles) {
                         try {
                             const tocContent = await fs.readFile(
-                                path.join(folderPath, tocFile), 
+                                path.join(folderPath, tocFile),
                                 'utf8'
                             );
-                            
+
                             const titleMatch = tocContent.match(/## Title: (.+)/);
                             const versionMatch = tocContent.match(/## Version: (.+)/);
                             const notesMatch = tocContent.match(/## Notes: (.+)/);
@@ -80,7 +84,7 @@ describe('Addon Scanning Tests', () => {
                             if (titleMatch) addon.name = titleMatch[1].trim();
                             if (versionMatch) addon.version = versionMatch[1].trim();
                             if (notesMatch) addon.description = notesMatch[1].trim();
-                            
+
                             break;
                         } catch (err) {
                             // Ignore and continue
@@ -106,9 +110,9 @@ describe('Addon Scanning Tests', () => {
     test('should return empty array when addon folder does not exist', async () => {
         fs.pathExists.mockResolvedValue(false);
 
-        const getInstalledAddons = async (installPath) => {
+        const getInstalledAddons = async installPath => {
             const addonPath = path.join(installPath, 'Interface', 'AddOns');
-            if (!await fs.pathExists(addonPath)) {
+            if (!(await fs.pathExists(addonPath))) {
                 return [];
             }
             return await fs.readdir(addonPath);
@@ -131,20 +135,20 @@ describe('Addon Scanning Tests', () => {
         fs.stat.mockResolvedValue({ isDirectory: () => true });
         fs.readFile.mockResolvedValue('## Title: Addon\n## Version: 1.0');
 
-        const getInstalledAddons = async (installPath) => {
+        const getInstalledAddons = async installPath => {
             const addonPath = path.join(installPath, 'Interface', 'AddOns');
-            if (!await fs.pathExists(addonPath)) return [];
-            
+            if (!(await fs.pathExists(addonPath))) return [];
+
             const folders = await fs.readdir(addonPath);
             const addons = [];
-            
+
             for (const folder of folders) {
                 const stat = await fs.stat(path.join(addonPath, folder));
                 if (stat.isDirectory()) {
                     addons.push({ name: folder, path: path.join(addonPath, folder) });
                 }
             }
-            
+
             return addons;
         };
 
@@ -160,12 +164,12 @@ describe('Addon Scanning Tests', () => {
         const installPath = '/wow';
         const addonPath = path.join(installPath, 'Interface', 'AddOns', 'ElvUI');
 
-        fs.pathExists.mockImplementation((path) => {
+        fs.pathExists.mockImplementation(path => {
             if (path.includes('.github-repo')) return Promise.resolve(true);
             return Promise.resolve(true);
         });
 
-        fs.readFile.mockImplementation((filePath) => {
+        fs.readFile.mockImplementation(filePath => {
             if (filePath.includes('.github-repo')) {
                 return Promise.resolve('tukui-org/ElvUI');
             }
@@ -178,7 +182,7 @@ describe('Addon Scanning Tests', () => {
             return Promise.reject(new Error('File not found'));
         });
 
-        const getAddonMetadata = async (addonPath) => {
+        const getAddonMetadata = async addonPath => {
             const metadata = {
                 githubRepo: null,
                 commit: null
@@ -209,10 +213,10 @@ describe('Addon Scanning Tests', () => {
         fs.pathExists.mockResolvedValue(true);
         fs.readdir.mockRejectedValue(new Error('Permission denied'));
 
-        const getInstalledAddons = async (installPath) => {
+        const getInstalledAddons = async installPath => {
             try {
                 const addonPath = path.join(installPath, 'Interface', 'AddOns');
-                if (!await fs.pathExists(addonPath)) return [];
+                if (!(await fs.pathExists(addonPath))) return [];
                 return await fs.readdir(addonPath);
             } catch (error) {
                 console.error('Error getting installed addons:', error);
@@ -233,9 +237,9 @@ describe('Addon Scanning Tests', () => {
         fs.readdir.mockResolvedValueOnce(['ElvUI']);
         fs.stat.mockResolvedValue({ isDirectory: () => true });
 
-        const getAddonCount = async (installPath) => {
+        const getAddonCount = async installPath => {
             const addonPath = path.join(installPath, 'Interface', 'AddOns');
-            if (!await fs.pathExists(addonPath)) return 0;
+            if (!(await fs.pathExists(addonPath))) return 0;
             const folders = await fs.readdir(addonPath);
             return folders.length;
         };

@@ -12,7 +12,7 @@ describe('Addon Installation Tests', () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
-        
+
         mockZip = {
             extract: jest.fn().mockResolvedValue(undefined),
             close: jest.fn().mockResolvedValue(undefined)
@@ -23,10 +23,9 @@ describe('Addon Installation Tests', () => {
 
     test('should install addon from GitHub repository', async () => {
         // Mock GitHub API responses
-        axios.get = jest.fn()
-            .mockResolvedValueOnce({
-                data: { default_branch: 'main' }
-            });
+        axios.get = jest.fn().mockResolvedValueOnce({
+            data: { default_branch: 'main' }
+        });
 
         axios.mockResolvedValueOnce({
             data: {
@@ -45,16 +44,17 @@ describe('Addon Installation Tests', () => {
         });
 
         fs.ensureDir = jest.fn().mockResolvedValue(undefined);
-        fs.readdir = jest.fn()
+        fs.readdir = jest
+            .fn()
             .mockResolvedValueOnce(['ElvUI-main']) // Extracted folder
             .mockResolvedValueOnce(['ElvUI', 'ElvUI_Config']) // Subdirectories with .toc files
             .mockResolvedValueOnce(['ElvUI.toc', 'core.lua'])
             .mockResolvedValueOnce(['ElvUI_Config.toc', 'config.lua']);
-        
-        fs.stat = jest.fn().mockResolvedValue({ 
-            isDirectory: () => true 
+
+        fs.stat = jest.fn().mockResolvedValue({
+            isDirectory: () => true
         });
-        
+
         fs.pathExists = jest.fn().mockResolvedValue(false);
         fs.move = jest.fn().mockResolvedValue(undefined);
         fs.remove = jest.fn().mockResolvedValue(undefined);
@@ -168,14 +168,15 @@ describe('Addon Installation Tests', () => {
         });
 
         fs.ensureDir = jest.fn().mockResolvedValue(undefined);
-        fs.readdir = jest.fn()
+        fs.readdir = jest
+            .fn()
             .mockResolvedValueOnce(['Details-main'])
             .mockResolvedValueOnce(['Details.toc', 'core.lua']); // .toc file at root
-        
-        fs.stat = jest.fn().mockResolvedValue({ 
-            isDirectory: () => false 
+
+        fs.stat = jest.fn().mockResolvedValue({
+            isDirectory: () => false
         });
-        
+
         fs.pathExists = jest.fn().mockResolvedValue(false);
         fs.move = jest.fn().mockResolvedValue(undefined);
         fs.remove = jest.fn().mockResolvedValue(undefined);
@@ -188,12 +189,8 @@ describe('Addon Installation Tests', () => {
 
             const targetPath = path.join(addonPath, repo);
             await fs.move('/tmp/source', targetPath);
-            
-            await fs.writeFile(
-                path.join(targetPath, '.github-repo'),
-                `${owner}/${repo}`,
-                'utf8'
-            );
+
+            await fs.writeFile(path.join(targetPath, '.github-repo'), `${owner}/${repo}`, 'utf8');
 
             return { success: true, addonsInstalled: 1 };
         };
@@ -226,7 +223,7 @@ describe('Addon Installation Tests', () => {
         fs.ensureDir = jest.fn().mockResolvedValue(undefined);
         fs.pathExists = jest.fn().mockResolvedValue(false);
 
-        const installAddon = async (installPath) => {
+        const installAddon = async installPath => {
             const addonPath = path.join(installPath, 'Interface', 'AddOns');
             await fs.ensureDir(addonPath);
             return { success: true };

@@ -5,12 +5,14 @@
 Your workflows are now **merge queue ready**! All CI/CD workflows will automatically run when PRs enter the merge queue.
 
 ### ✅ Workflows Updated
+
 - `test.yml` - Tests on merge queue
 - `lint.yml` - Code quality on merge queue
 - `security.yml` - Security scans on merge queue
 - `pr-checks.yml` - PR validation on merge queue
 
 ### 📚 Documentation Created
+
 - `MERGE_QUEUE_GUIDE.md` - Complete explanation
 - `MERGE_QUEUE_SETUP.md` - Setup instructions
 
@@ -19,32 +21,34 @@ Your workflows are now **merge queue ready**! All CI/CD workflows will automatic
 ### Quick Setup (5 minutes)
 
 1. **Go to Repository Settings**
-   ```
-   https://github.com/dadwow/launcher/settings/branches
-   ```
+
+    ```
+    https://github.com/dadwow/launcher/settings/branches
+    ```
 
 2. **Edit `main` Branch Protection**
-   - Find the `main` branch rule
-   - Or create new rule for `main`
+    - Find the `main` branch rule
+    - Or create new rule for `main`
 
 3. **Enable These Settings**
-   ```
-   ✅ Require pull request reviews (1 approval)
-   ✅ Require status checks to pass before merging
-      Select these checks:
-      - lint
-      - test (18.x)
-      - test (20.x)
-      - security-audit
-      - build-check
-   ✅ Require conversation resolution
-   ✅ Require merge queue
-      Method: Squash and merge
-      Build concurrency: 3
-      Min entries: 1
-      Max entries: 5
-      Timeout: 60 minutes
-   ```
+
+    ```
+    ✅ Require pull request reviews (1 approval)
+    ✅ Require status checks to pass before merging
+       Select these checks:
+       - lint
+       - test (18.x)
+       - test (20.x)
+       - security-audit
+       - build-check
+    ✅ Require conversation resolution
+    ✅ Require merge queue
+       Method: Squash and merge
+       Build concurrency: 3
+       Min entries: 1
+       Max entries: 5
+       Timeout: 60 minutes
+    ```
 
 4. **Save Changes**
 
@@ -66,6 +70,7 @@ git push origin test/merge-queue-test
 ## 📊 What Changes for Users
 
 ### Before (Normal Merge)
+
 ```
 1. Create PR
 2. Get approval
@@ -74,9 +79,10 @@ git push origin test/merge-queue-test
 ```
 
 ### After (With Merge Queue)
+
 ```
 1. Create PR
-2. Get approval  
+2. Get approval
 3. Click "Merge when ready" ← Different button!
 4. PR enters queue
 5. GitHub tests it with other PRs
@@ -86,19 +92,15 @@ git push origin test/merge-queue-test
 ## 🎯 Benefits You Get
 
 1. ✅ **Prevents "works on my branch" bugs**
-   - PRs tested together before merging
-   
+    - PRs tested together before merging
 2. ✅ **Keeps main stable**
-   - Much lower chance of breaking builds
-   
+    - Much lower chance of breaking builds
 3. ✅ **Parallel testing**
-   - Multiple PRs tested at once
-   
+    - Multiple PRs tested at once
 4. ✅ **Future-proof**
-   - Ready for team growth
-   
+    - Ready for team growth
 5. ✅ **Automatic retesting**
-   - If main changes, PRs retested
+    - If main changes, PRs retested
 
 ## 📋 Recommended Settings
 
@@ -158,21 +160,23 @@ Timeout: 60 minutes
 1. **Use "Merge when ready"** instead of regular merge button
 
 2. **Enable auto-merge** for your PRs:
-   - Saves you from having to click merge
-   - PR merges automatically when approved + checks pass
+    - Saves you from having to click merge
+    - PR merges automatically when approved + checks pass
 
 3. **Monitor the queue** at:
-   ```
-   https://github.com/dadwow/launcher/commits/main
-   ```
+
+    ```
+    https://github.com/dadwow/launcher/commits/main
+    ```
 
 4. **Check PR status** in the PR's "Checks" tab
-   - Shows queue position
-   - Shows estimated merge time
+    - Shows queue position
+    - Shows estimated merge time
 
 ## 📈 Cost
 
 **Your project**: FREE ✅
+
 - Public repository
 - Unlimited GitHub Actions minutes
 - No additional cost for merge queue
@@ -193,6 +197,7 @@ Settings can be changed anytime in branch protection:
 ## 📚 Full Documentation
 
 Detailed guides available:
+
 - `docs/development/MERGE_QUEUE_SETUP.md` - Complete setup instructions
 - `docs/development/MERGE_QUEUE_GUIDE.md` - How it works, when to use
 - `docs/development/BRANCHING_STRATEGY.md` - Workflow integration
@@ -200,6 +205,7 @@ Detailed guides available:
 ## ⚠️ Important Note
 
 The merge queue is **OPTIONAL** but **READY**:
+
 - ✅ Workflows configured
 - ✅ Documentation complete
 - ⏳ Needs GitHub settings enabled (5 min)

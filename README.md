@@ -15,20 +15,22 @@ A modern Electron-based launcher for World of Warcraft 3.3.5a clients with cross
 
 ## Platform Support
 
-| Platform | Status | Notes |
-|----------|--------|-------|
-| Windows | ✅ Full Support | Native client runs directly |
-| macOS Intel | ✅ Full Support | Via CrossOver/Wine |
-| macOS Apple Silicon | ✅ Full Support | Via CrossOver/Wine |
-| Linux | ✅ Full Support | Via Wine |
+| Platform            | Status          | Notes                       |
+| ------------------- | --------------- | --------------------------- |
+| Windows             | ✅ Full Support | Native client runs directly |
+| macOS Intel         | ✅ Full Support | Via CrossOver/Wine          |
+| macOS Apple Silicon | ✅ Full Support | Via CrossOver/Wine          |
+| Linux               | ✅ Full Support | Via Wine                    |
 
 ## Quick Start
 
 ### Prerequisites
-- Node.js 16+ 
+
+- Node.js 16+
 - For macOS: CrossOver 25.0.1 or later
 
 ### Installation
+
 ```bash
 # Clone the repository
 git clone <repository-url>
@@ -46,6 +48,7 @@ npm run dev
 ```
 
 ### Building for Distribution
+
 ```bash
 # Build for current platform
 npm run build
@@ -59,18 +62,22 @@ npm run build:linux
 ## Documentation
 
 ### Setup & Configuration
+
 - **[Setup Guide](docs/setup/SETUP_GUIDE.md)** - Complete installation and configuration
 - **[CrossOver Setup](docs/setup/CROSSOVER_MACOS.md)** - macOS-specific Wine configuration
 
 ### Platform-Specific
+
 - **[Apple Silicon Guide](docs/apple-silicon/README.md)** - M1/M2/M3 support status and troubleshooting
 - **[Windows Build Guide](docs/development/WINDOWS_BUILD.md)** - Building on Windows
 
 ### Troubleshooting
+
 - **[Download Troubleshooting](docs/troubleshooting/DOWNLOAD_TROUBLESHOOTING.md)** - Client download issues
 - **[Fixes Changelog](docs/FIXES_CHANGELOG.md)** - Recent bug fixes and improvements
 
 ### Development
+
 - **[Testing Guide](docs/development/TESTING.md)** - Running and writing tests
 - **[CI/CD Setup](docs/development/CI_CD_SETUP.md)** - Continuous integration configuration
 - **[Cross-Platform Guide](docs/development/CROSS_PLATFORM_GUIDE.md)** - Multi-platform development
@@ -141,11 +148,13 @@ ac-launcher/
 ## Known Issues
 
 ### Apple Silicon (M1/M2/M3)
+
 - ⚠️ Game crashes after character select screen
 - Crash: `ILLEGAL_INSTRUCTION (0xC000001D)` at address `07974360`
 - See [Apple Silicon Guide](docs/apple-silicon/README.md) for details and workarounds
 
 ### General
+
 - See [GitHub Issues](../../issues) for reported problems
 
 ## Contributing

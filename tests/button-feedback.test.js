@@ -20,13 +20,13 @@ describe('Button Feedback System Tests', () => {
             dataset: {},
             classList: {
                 classes: [],
-                add: jest.fn(function(className) {
+                add: jest.fn(function (className) {
                     this.classes.push(className);
                 }),
-                remove: jest.fn(function(className) {
+                remove: jest.fn(function (className) {
                     this.classes = this.classes.filter(c => c !== className);
                 }),
-                contains: jest.fn(function(className) {
+                contains: jest.fn(function (className) {
                     return this.classes.includes(className);
                 })
             },
@@ -100,11 +100,11 @@ describe('Button Feedback System Tests', () => {
                 if (!button.dataset.originalText) {
                     button.dataset.originalText = textSpan.textContent;
                 }
-                
+
                 textSpan.textContent = message;
                 button.classList.remove('btn-feedback-success', 'btn-feedback-error');
                 button.classList.add(`btn-feedback-${type}`);
-                
+
                 setTimeout(() => {
                     if (button.dataset.originalText) {
                         textSpan.textContent = button.dataset.originalText;
@@ -137,10 +137,10 @@ describe('Button Feedback System Tests', () => {
                 if (!button.dataset.originalText) {
                     button.dataset.originalText = textSpan.textContent;
                 }
-                
+
                 textSpan.textContent = message;
                 button.classList.add(`btn-feedback-${type}`);
-                
+
                 setTimeout(() => {
                     if (button.dataset.originalText) {
                         textSpan.textContent = button.dataset.originalText;
@@ -186,10 +186,10 @@ describe('Button Feedback System Tests', () => {
                 if (!button.dataset.originalText) {
                     button.dataset.originalText = textSpan.textContent;
                 }
-                
+
                 textSpan.textContent = message;
                 button.classList.add(`btn-feedback-${type}`);
-                
+
                 setTimeout(() => {
                     if (button.dataset.originalText) {
                         textSpan.textContent = button.dataset.originalText;

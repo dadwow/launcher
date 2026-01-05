@@ -38,13 +38,8 @@ module.exports = [
             }
         },
         rules: {
-            indent: [
-                'error',
-                4,
-                {
-                    SwitchCase: 1
-                }
-            ],
+            // Disable indent rule - let Prettier handle formatting
+            // indent: ['error', 4, { SwitchCase: 1 }],
             'linebreak-style': ['error', 'unix'],
             quotes: [
                 'error',

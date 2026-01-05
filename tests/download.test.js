@@ -10,7 +10,7 @@ jest.mock('node-stream-zip');
 
 // Mock Electron
 const mockApp = {
-    getPath: jest.fn((name) => {
+    getPath: jest.fn(name => {
         if (name === 'temp') return '/tmp';
         if (name === 'userData') return '/tmp/userdata';
         return '/tmp';
@@ -33,7 +33,7 @@ describe('Client File Download Tests', () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
-        
+
         // Find the download handler that was registered
         const handleCalls = mockIpcMain.handle.mock.calls;
         const downloadCall = handleCalls.find(call => call[0] === 'start-download');
@@ -122,7 +122,7 @@ describe('Client File Download Tests', () => {
         axios.mockResolvedValue(mockResponse);
 
         let progressCalled = false;
-        const mockProgressCallback = (progress) => {
+        const mockProgressCallback = progress => {
             progressCalled = true;
             expect(progress).toHaveProperty('percent');
             expect(progress).toHaveProperty('transferred');
