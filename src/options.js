@@ -921,9 +921,9 @@ function showToast(message, type = 'info', _duration = 4000) {
     console.log(`${type.toUpperCase()}: ${message}`);
 }
 
-function setButtonState(buttonId, state, message = '', _duration = 3000) {
+function setButtonState(buttonId, state, message = '', duration = 3000) {
     if (message) {
-        setButtonFeedback(buttonId, message, state, _duration);
+        setButtonFeedback(buttonId, message, state, duration);
     } else {
         setButtonLoading(buttonId, false);
     }
