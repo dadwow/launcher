@@ -5,6 +5,7 @@ on:
     branches: [ main, develop, staging ]
   pull_request:
     branches: [ main, develop, staging ]
+  merge_group:
   schedule:
     # Run security scan every Monday at 9am UTC
     - cron: '0 9 * * 1'
