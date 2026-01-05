@@ -91,10 +91,6 @@ describe('Addon Validation', () => {
         jest.clearAllMocks();
     });
 
-    beforeEach(() => {
-        jest.clearAllMocks();
-    });
-
     test('should validate a valid WoW addon repository with .toc in root (Details)', async () => {
         // Mock repo response
         axios.get.mockResolvedValueOnce({
