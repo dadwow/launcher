@@ -876,15 +876,6 @@ function updateGameStatus(type, message) {
     elements.gameStatus.innerHTML = `<span class="status-icon">${getStatusIcon(type)}</span><span>${message}</span>`;
 }
 
-function updateLaunchButton(enabled, statusText) {
-    // This function is maintained for compatibility but now delegates to main action button
-    if (enabled && appState.isWowInstalled) {
-        updateMainActionButton('play', 'Launch World of Warcraft', true);
-    } else {
-        updateMainActionButton('configure', statusText, false);
-    }
-}
-
 // Update main action button appearance and state
 function updateMainActionButton(state, text, enabled) {
     elements.mainActionButton.dataset.state = state;
@@ -953,13 +944,6 @@ function startServerStatusPolling() {
         clearInterval(statusPollInterval);
     }
     statusPollInterval = setInterval(checkServerStatus, 30000);
-}
-
-function stopServerStatusPolling() {
-    if (statusPollInterval) {
-        clearInterval(statusPollInterval);
-        statusPollInterval = null;
-    }
 }
 
 function getStatusIcon(type) {
@@ -1063,22 +1047,6 @@ function hideUpdateNotification() {
     // Don't show notification modal - updates handled through main UI
     console.log('Update notification hidden');
     checkGameStatus(); // Restore normal button state
-}
-
-async function downloadLauncherUpdate() {
-    try {
-        elements.updateDownloadBtn.disabled = true;
-        elements.updateDownloadBtn.textContent = 'Starting...';
-        elements.updateDismissBtn.style.display = 'none';
-        await window.electronAPI.downloadUpdate();
-    } catch (error) {
-        console.error('Error downloading update:', error);
-        elements.updateDownloadBtn.disabled = false;
-        elements.updateDownloadBtn.textContent = 'Download Update';
-        elements.updateDismissBtn.style.display = 'block';
-        showError('Failed to download update: ' + error.message);
-        checkGameStatus(); // Restore normal button state
-    }
 }
 
 function showUpdateNotification(version) {

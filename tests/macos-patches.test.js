@@ -5,13 +5,9 @@
 
 const fs = require('fs-extra');
 const path = require('path');
-const { promisify } = require('util');
-const { exec } = require('child_process');
 
 jest.mock('fs-extra');
 jest.mock('child_process');
-
-const execAsync = promisify(exec);
 
 describe('macOS Patches Tests', () => {
     let platformManager;

@@ -164,7 +164,7 @@ describe('Button Feedback System Tests', () => {
     test('should handle missing button gracefully', () => {
         document.getElementById = jest.fn(() => null);
 
-        const setButtonLoading = (buttonId, loading = true) => {
+        const setButtonLoading = (buttonId, _loading = true) => {
             const button = document.getElementById(buttonId);
             if (button) {
                 button.classList.add('btn-loading');

@@ -182,7 +182,7 @@ function setupEventListeners() {
     try {
         // Tab switching
         elements.tabButtons.forEach(button => {
-            button.addEventListener('click', e => {
+            button.addEventListener('click', _e => {
                 switchTab(button.dataset.tab);
             });
         });
@@ -350,7 +350,6 @@ async function testRealmConnection() {
 // Install addon from GitHub
 async function installAddonFromGitHub() {
     const repoUrl = elements.githubRepoUrl?.value;
-    const installBtn = document.getElementById('install-addon-btn');
 
     if (!repoUrl) {
         setButtonState('install-addon-btn', 'error', 'Please enter a GitHub repository URL');
@@ -809,6 +808,7 @@ async function uninstallAddon(addonName) {
 }
 
 // Check for addon updates
+// eslint-disable-next-line no-unused-vars
 async function checkForUpdates() {
     const updateBtn = document.querySelector('button[onclick="checkForUpdates()"]');
 
@@ -917,21 +917,16 @@ function setButtonFeedback(buttonId, message, type = 'success', duration = 2000)
 }
 
 // Simplified functions for compatibility
-function showToast(message, type = 'info', duration = 4000) {
+function showToast(message, type = 'info', _duration = 4000) {
     console.log(`${type.toUpperCase()}: ${message}`);
 }
 
-function setButtonState(buttonId, state, message = '', duration = 3000) {
+function setButtonState(buttonId, state, message = '', _duration = 3000) {
     if (message) {
-        setButtonFeedback(buttonId, message, state, duration);
+        setButtonFeedback(buttonId, message, state, _duration);
     } else {
         setButtonLoading(buttonId, false);
     }
-}
-
-// Show info message
-function showInfo(message) {
-    console.log(`INFO: ${message}`);
 }
 
 // Show error message

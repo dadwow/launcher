@@ -101,7 +101,7 @@ describe('Integration Tests - Complete Launcher Workflow', () => {
         fs.writeFile = jest.fn().mockResolvedValue(undefined);
 
         const installAddon = async (owner, repo, installPath) => {
-            const repoInfo = await axios.get(`https://api.github.com/repos/${owner}/${repo}`);
+            await axios.get(`https://api.github.com/repos/${owner}/${repo}`);
             const addonPath = path.join(installPath, 'Interface', 'AddOns');
             await fs.ensureDir(addonPath);
 
@@ -195,7 +195,7 @@ describe('Integration Tests - Complete Launcher Workflow', () => {
         fs.writeFile = jest.fn().mockResolvedValue(undefined);
 
         const updateAddon = async (githubRepo, installPath) => {
-            const [owner, repo] = githubRepo.split('/');
+            githubRepo.split('/');
             const addonPath = path.join(installPath, 'Interface', 'AddOns');
 
             const addonFolders = ['ElvUI', 'ElvUI_Config'];

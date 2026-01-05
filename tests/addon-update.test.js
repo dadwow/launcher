@@ -139,7 +139,7 @@ describe('Addon Update Tests', () => {
                 await fs.writeFile(path.join(addonTargetPath, '.github-repo'), githubRepo, 'utf8');
 
                 // Get and save latest commit
-                const commitsResponse = await axios.get(
+                await axios.get(
                     `https://api.github.com/repos/${owner}/${repo}/commits/${defaultBranch}`,
                     { headers: { 'User-Agent': 'WoW-Launcher' } }
                 );
@@ -189,7 +189,6 @@ describe('Addon Update Tests', () => {
         });
 
         // Mock WTF folder structure (SavedVariables)
-        const wtfPath = '/wow/WTF/Account/ACCOUNT/SavedVariables';
         fs.pathExists = jest
             .fn()
             .mockResolvedValueOnce(true) // Old addon exists
@@ -236,7 +235,7 @@ describe('Addon Update Tests', () => {
     test('should handle update errors gracefully', async () => {
         axios.get = jest.fn().mockRejectedValue(new Error('Network timeout'));
 
-        const updateAddon = async (githubRepo, installPath) => {
+        const updateAddon = async (githubRepo, _installPath) => {
             try {
                 const [owner, repo] = githubRepo.split('/');
                 await axios.get(`https://api.github.com/repos/${owner}/${repo}`);
@@ -282,7 +281,7 @@ describe('Addon Update Tests', () => {
         fs.remove = jest.fn().mockResolvedValue(undefined);
         fs.writeFile = jest.fn().mockResolvedValue(undefined);
 
-        const updateAddon = async (githubRepo, installPath) => {
+        const updateAddon = async (_githubRepo, _installPath) => {
             const zipPath = '/tmp/addon-update.zip';
             const tempExtractPath = '/tmp/addon-extract-123';
 

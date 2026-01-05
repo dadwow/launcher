@@ -94,7 +94,7 @@ describe('Client File Extraction Tests', () => {
             await zip.extract(null, tempExtractPath);
             await zip.close();
 
-            const extractedItems = await fs.readdir(tempExtractPath);
+            await fs.readdir(tempExtractPath);
 
             // Multiple items at root - no flattening needed
             await fs.copy(tempExtractPath, destination);
@@ -114,7 +114,7 @@ describe('Client File Extraction Tests', () => {
     test('should handle extraction errors', async () => {
         mockZip.extract.mockRejectedValue(new Error('Corrupted archive'));
 
-        const extractZipFile = async (zipPath, destination) => {
+        const extractZipFile = async (zipPath, _destination) => {
             try {
                 const tempExtractPath = path.join('/tmp', `extract-${Date.now()}`);
                 await fs.ensureDir(tempExtractPath);
