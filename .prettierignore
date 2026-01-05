@@ -1,0 +1,9 @@
+node_modules/
+dist/
+coverage/
+build/
+*.min.js
+*.bundle.js
+package-lock.json
+.github/
+docs/
