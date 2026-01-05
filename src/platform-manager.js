@@ -154,7 +154,7 @@ class PlatformManager {
                         version: await this.getWineVersion(check.command)
                     };
                 }
-            } catch (error) {
+            } catch {
                 // Command not found, continue checking
             }
         }
@@ -166,25 +166,25 @@ class PlatformManager {
         try {
             const { stdout } = await execAsync(`${wineCommand} --version`);
             return stdout.trim();
-        } catch (error) {
+        } catch {
             return 'unknown';
         }
     }
 
     // Wine prefix management (deprecated - kept for compatibility)
     // TurtleSilicon approach doesn't require Wine prefixes
-    getWinePrefixPath(installPath) {
+    getWinePrefixPath(_installPath) {
         // No longer used with TurtleSilicon-style launching
         return null;
     }
 
-    async createWinePrefix(prefixPath) {
+    async createWinePrefix(_prefixPath) {
         // No longer required with TurtleSilicon-style launching
         // Wine/CrossOver will handle configuration automatically
         return true;
     }
 
-    async installWineComponents(prefixPath, winePath) {
+    async installWineComponents(_prefixPath, _winePath) {
         // No longer required with TurtleSilicon-style launching
         // Wine/CrossOver will handle DirectX and dependencies automatically
         console.log('Wine components installation skipped (TurtleSilicon approach)');
@@ -218,7 +218,7 @@ class PlatformManager {
         return { success: true, process: wowProcess };
     }
 
-    async launchWoWWine(installPath, wineConfig) {
+    async launchWoWWine(installPath, _wineConfig) {
         const wine = await this.checkWineInstallation();
         if (!wine.installed) {
             throw new Error(
@@ -321,7 +321,6 @@ class PlatformManager {
     // These patches solve the x87 FPU limitation when running x86 WoW through Rosetta 2
     // NOT applicable to Windows (native) or Linux (x86_64 Wine)
     async installTurtleSiliconPatches(installPath, wine) {
-        const { app } = require('electron');
         const { execSync } = require('child_process');
 
         const result = {
@@ -530,8 +529,6 @@ class PlatformManager {
         }
 
         // Set up environment
-        const rosettax87Dir = path.join(installPath, 'rosettax87');
-
         // 🎯 MINIMAL STABLE CONFIGURATION
         // Match TurtleSilicon's exact working environment variables
         // Note: GPU hardware shaders (M2UseShaders/pixelShaders) cause crashes with Wine/d9vk
@@ -727,11 +724,9 @@ class PlatformManager {
             // Check if Homebrew is installed
             if (progressCallback) progressCallback('Checking system requirements...', 10);
 
-            let hasHomebrew = false;
             try {
                 await execAsync('which brew');
-                hasHomebrew = true;
-            } catch (error) {
+            } catch {
                 // Homebrew not found, install it
                 if (progressCallback) progressCallback('Installing package manager...', 20);
 
@@ -854,7 +849,7 @@ class PlatformManager {
             try {
                 await execAsync(`which ${manager.command}`);
                 return manager.name;
-            } catch (error) {
+            } catch {
                 continue;
             }
         }

@@ -20,7 +20,6 @@ describe('Addon Scanning Tests', () => {
 
     test('should scan for installed addons on launcher startup', async () => {
         const installPath = '/wow';
-        const addonPath = path.join(installPath, 'Interface', 'AddOns');
 
         fs.pathExists.mockResolvedValue(true);
         fs.readdir.mockResolvedValue(['ElvUI', 'DBM-Core', 'Recount']);
@@ -86,7 +85,7 @@ describe('Addon Scanning Tests', () => {
                             if (notesMatch) addon.description = notesMatch[1].trim();
 
                             break;
-                        } catch (err) {
+                        } catch {
                             // Ignore and continue
                         }
                     }

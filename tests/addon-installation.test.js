@@ -204,7 +204,7 @@ describe('Addon Installation Tests', () => {
     test('should handle addon installation errors', async () => {
         axios.get = jest.fn().mockRejectedValue(new Error('Repository not found'));
 
-        const installAddon = async (owner, repo, installPath) => {
+        const installAddon = async (owner, repo, _installPath) => {
             try {
                 await axios.get(`https://api.github.com/repos/${owner}/${repo}`);
                 return { success: true };

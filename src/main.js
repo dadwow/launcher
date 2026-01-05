@@ -16,7 +16,7 @@ process.on('uncaughtException', error => {
 });
 
 // Handle unhandled promise rejections
-process.on('unhandledRejection', (reason, promise) => {
+process.on('unhandledRejection', (reason, _promise) => {
     console.error('Unhandled promise rejection:', reason);
 });
 
@@ -122,7 +122,7 @@ autoUpdater.on('update-available', info => {
     }
 });
 
-autoUpdater.on('update-not-available', info => {
+autoUpdater.on('update-not-available', _info => {
     console.log('Update not available');
     if (mainWindow) {
         mainWindow.webContents.send('update-status', { status: 'not-available' });
@@ -881,7 +881,7 @@ ipcMain.handle('validate-addon-repo', async (event, owner, repo) => {
                 }
             );
             readme = readmeResponse.data;
-        } catch (err) {
+        } catch {
             console.log('No README found');
         }
 
@@ -895,7 +895,7 @@ ipcMain.handle('validate-addon-repo', async (event, owner, repo) => {
                 }
             );
             latestRelease = releaseResponse.data;
-        } catch (err) {
+        } catch {
             console.log('No releases found');
         }
 
@@ -909,7 +909,7 @@ ipcMain.handle('validate-addon-repo', async (event, owner, repo) => {
                 }
             );
             releases = releasesResponse.data;
-        } catch (err) {
+        } catch {
             console.log('No releases found');
         }
 
@@ -1269,7 +1269,7 @@ async function installAddonWithArchive(owner, repo, addonPath) {
             );
             defaultBranch = repoInfoResponse.data.default_branch || 'main';
             console.log(`Default branch for ${owner}/${repo}: ${defaultBranch}`);
-        } catch (error) {
+        } catch {
             console.log('Could not get repo info, trying common branches...');
         }
 
@@ -1304,7 +1304,7 @@ async function installAddonWithArchive(owner, repo, addonPath) {
                 branchUsed = branch;
                 console.log(`Successfully downloaded from branch: ${branch}`);
                 break;
-            } catch (error) {
+            } catch {
                 console.log(`Branch ${branch} not found, trying next...`);
                 if (await fs.pathExists(zipPath)) {
                     await fs.remove(zipPath);
@@ -1685,7 +1685,7 @@ ipcMain.handle('get-installed-addons', async (event, installPath) => {
                         if (titleMatch) addon.name = titleMatch[1].trim();
                         if (versionMatch) addon.version = versionMatch[1].trim();
                         if (notesMatch) addon.description = notesMatch[1].trim();
-                    } catch (tocError) {
+                    } catch {
                         // Ignore TOC reading errors
                     }
                 }
@@ -1696,7 +1696,7 @@ ipcMain.handle('get-installed-addons', async (event, installPath) => {
                     try {
                         const repoInfo = await fs.readFile(repoFile, 'utf8');
                         addon.githubRepo = repoInfo.trim();
-                    } catch (error) {
+                    } catch {
                         // Ignore
                     }
                 }
@@ -1736,7 +1736,7 @@ ipcMain.handle('test-realm-connection', async (event, realmAddress) => {
         try {
             // Try to connect to the realm on port 8085 (AzerothCore worldserver port)
             // This is a basic connectivity test
-            const response = await axios({
+            await axios({
                 method: 'GET',
                 url: `http://${realmAddress}:8085`,
                 timeout: 5000,
@@ -1792,7 +1792,7 @@ ipcMain.handle('get-wine-prefix-path', (event, installPath) => {
 });
 
 // Automatic Wine installation handlers
-ipcMain.handle('install-wine-automatically', async event => {
+ipcMain.handle('install-wine-automatically', async _event => {
     try {
         const result = await platformManager.installWineAutomatically((message, progress) => {
             mainWindow.webContents.send('wine-install-progress', { message, progress });
@@ -1821,19 +1821,6 @@ ipcMain.handle('apply-macos-patches', async (event, installPath) => {
         return { success: false, error: error.message };
     }
 });
-
-// Helper function to load settings
-async function loadSettingsFromFile() {
-    try {
-        const settingsPath = path.join(app.getPath('userData'), 'settings.json');
-        if (await fs.pathExists(settingsPath)) {
-            return await fs.readJson(settingsPath);
-        }
-        return {};
-    } catch (error) {
-        return {};
-    }
-}
 
 // Prevent multiple instances
 const gotTheLock = app.requestSingleInstanceLock();

@@ -1,12 +1,9 @@
 const fs = require('fs-extra');
-const path = require('path');
 const axios = require('axios');
-const StreamZip = require('node-stream-zip');
 
 // Mock modules
 jest.mock('axios');
 jest.mock('fs-extra');
-jest.mock('node-stream-zip');
 
 // Mock Electron
 const mockApp = {
@@ -29,17 +26,8 @@ jest.mock('electron', () => ({
 }));
 
 describe('Client File Download Tests', () => {
-    let downloadHandler;
-
     beforeEach(() => {
         jest.clearAllMocks();
-
-        // Find the download handler that was registered
-        const handleCalls = mockIpcMain.handle.mock.calls;
-        const downloadCall = handleCalls.find(call => call[0] === 'start-download');
-        if (downloadCall) {
-            downloadHandler = downloadCall[1];
-        }
     });
 
     test('should download client files successfully', async () => {
@@ -66,9 +54,9 @@ describe('Client File Download Tests', () => {
         const destination = '/path/to/client';
 
         // Mock the download handler directly
-        const mockDownloadHandler = async (event, url, destination) => {
+        const mockDownloadHandler = async (_event, url, destination) => {
             await fs.ensureDir(destination);
-            const response = await axios({ url, method: 'GET', responseType: 'stream' });
+            await axios({ url, method: 'GET', responseType: 'stream' });
             return { success: true };
         };
 
@@ -82,7 +70,7 @@ describe('Client File Download Tests', () => {
     test('should handle download errors gracefully', async () => {
         axios.mockRejectedValue(new Error('Network error'));
 
-        const mockDownloadHandler = async (event, url, destination) => {
+        const mockDownloadHandler = async (_event, url, _destination) => {
             try {
                 await axios({ url, method: 'GET', responseType: 'stream' });
                 return { success: true };
@@ -120,13 +108,6 @@ describe('Client File Download Tests', () => {
         };
 
         axios.mockResolvedValue(mockResponse);
-
-        let progressCalled = false;
-        const mockProgressCallback = progress => {
-            progressCalled = true;
-            expect(progress).toHaveProperty('percent');
-            expect(progress).toHaveProperty('transferred');
-        };
 
         // Progress tracking would be handled in the actual implementation
         expect(mockResponse.headers['content-length']).toBe('1000');

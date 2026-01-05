@@ -3,7 +3,6 @@
 // Enables TurtleSilicon's winerosetta.dll injection system
 
 const fs = require('fs-extra');
-const path = require('path');
 
 class PEPatcher {
     constructor(exePath) {
@@ -86,7 +85,7 @@ class PEPatcher {
 }
 
 // Simpler approach: Check if we can call TurtleSilicon's patcher programmatically
-async function patchWowExe(wowExePath, outputPath, installPath) {
+async function patchWowExe(wowExePath, outputPath, _installPath) {
     console.log('Attempting to patch WoW.exe...');
 
     const wowPatchedExists = await fs.pathExists(outputPath);
