@@ -40,14 +40,6 @@ updates:
           - "*"
         dependency-type: "development"
       
-      # Separate group for Electron updates (major updates)
-      electron:
-        patterns:
-          - "electron"
-          - "electron-*"
-        update-types:
-          - "major"
-      
       # Testing framework updates
       testing:
         patterns:
