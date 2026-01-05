@@ -1,0 +1,113 @@
+name: Code Quality
+
+on:
+  push:
+    branches: [ main, develop, staging, feature/**, fix/** ]
+  pull_request:
+    branches: [ main, develop, staging ]
+  merge_group:
+
+jobs:
+  lint:
+    name: Lint Code
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify Husky installation
+        run: |
+          if [ ! -d ".husky" ]; then
+            echo "⚠️ Husky hooks directory not found. Running prepare script..."
+            npm run prepare
+            if [ -d ".husky" ]; then
+              echo "✅ Husky hooks initialized successfully"
+            else
+              echo "❌ Failed to initialize Husky hooks"
+              exit 1
+            fi
+          else
+            echo "✅ Husky hooks already initialized"
+          fi
+
+      - name: Run ESLint
+        run: npm run lint
+        continue-on-error: false
+
+      - name: Check code formatting
+        run: npm run format:check
+        continue-on-error: false
+
+  format-check:
+    name: Format Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check Prettier formatting
+        run: npm run format:check
+
+      - name: Annotate formatting issues
+        if: failure()
+        run: |
+          echo "::warning::Code formatting issues detected. Run 'npm run format' to fix."
+
+  dependency-audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Run npm audit
+        run: npm audit --audit-level=moderate
+        continue-on-error: true
+
+      - name: Check for outdated dependencies
+        run: npm outdated || true
+
+  quality-gate:
+    name: Quality Gate
+    needs: [lint, format-check, dependency-audit]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Check quality gate status
+        run: |
+          if [ "${{ needs.lint.result }}" == "failure" ] || [ "${{ needs.format-check.result }}" == "failure" ]; then
+            echo "❌ Quality gate failed!"
+            echo "Lint status: ${{ needs.lint.result }}"
+            echo "Format status: ${{ needs.format-check.result }}"
+            exit 1
+          else
+            echo "✅ Quality gate passed!"
+          fi

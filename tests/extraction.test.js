@@ -10,7 +10,7 @@ describe('Client File Extraction Tests', () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
-        
+
         mockZip = {
             extract: jest.fn().mockResolvedValue(undefined),
             close: jest.fn().mockResolvedValue(undefined),
@@ -22,11 +22,13 @@ describe('Client File Extraction Tests', () => {
 
     test('should extract zip file to destination', async () => {
         fs.ensureDir = jest.fn().mockResolvedValue(undefined);
-        fs.readdir = jest.fn()
+        fs.readdir = jest
+            .fn()
             .mockResolvedValueOnce(['ChromieCraft_3.3.5a']) // First readdir - finds nested folder
             .mockResolvedValueOnce(['Data', 'Wow.exe', 'Interface']); // Second readdir - contents
         fs.stat = jest.fn().mockResolvedValue({ isDirectory: () => true });
-        fs.readdir = jest.fn()
+        fs.readdir = jest
+            .fn()
             .mockResolvedValueOnce(['ChromieCraft_3.3.5a'])
             .mockResolvedValueOnce(['Data', 'Wow.exe']);
         fs.copy = jest.fn().mockResolvedValue(undefined);
@@ -45,15 +47,14 @@ describe('Client File Extraction Tests', () => {
             if (extractedItems.length === 1) {
                 const firstItem = path.join(tempExtractPath, extractedItems[0]);
                 const stat = await fs.stat(firstItem);
-                
+
                 if (stat.isDirectory()) {
                     // Check if it contains WoW files
                     const contents = await fs.readdir(firstItem);
-                    const hasWowFiles = contents.some(file => 
-                        file.toLowerCase() === 'data' || 
-                        file.toLowerCase() === 'wow.exe'
+                    const hasWowFiles = contents.some(
+                        file => file.toLowerCase() === 'data' || file.toLowerCase() === 'wow.exe'
                     );
-                    
+
                     if (hasWowFiles) {
                         // Flatten the structure
                         await fs.copy(firstItem, destination);
@@ -81,8 +82,7 @@ describe('Client File Extraction Tests', () => {
 
     test('should handle extraction of non-nested zip files', async () => {
         fs.ensureDir = jest.fn().mockResolvedValue(undefined);
-        fs.readdir = jest.fn()
-            .mockResolvedValueOnce(['Data', 'Wow.exe', 'Interface']); // Multiple items at root
+        fs.readdir = jest.fn().mockResolvedValueOnce(['Data', 'Wow.exe', 'Interface']); // Multiple items at root
         fs.copy = jest.fn().mockResolvedValue(undefined);
         fs.remove = jest.fn().mockResolvedValue(undefined);
 
@@ -94,8 +94,8 @@ describe('Client File Extraction Tests', () => {
             await zip.extract(null, tempExtractPath);
             await zip.close();
 
-            const extractedItems = await fs.readdir(tempExtractPath);
-            
+            await fs.readdir(tempExtractPath);
+
             // Multiple items at root - no flattening needed
             await fs.copy(tempExtractPath, destination);
             await fs.remove(tempExtractPath);
@@ -114,7 +114,7 @@ describe('Client File Extraction Tests', () => {
     test('should handle extraction errors', async () => {
         mockZip.extract.mockRejectedValue(new Error('Corrupted archive'));
 
-        const extractZipFile = async (zipPath, destination) => {
+        const extractZipFile = async (zipPath, _destination) => {
             try {
                 const tempExtractPath = path.join('/tmp', `extract-${Date.now()}`);
                 await fs.ensureDir(tempExtractPath);

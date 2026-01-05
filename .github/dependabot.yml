@@ -1,0 +1,79 @@
+version: 2
+
+updates:
+  # Enable version updates for npm
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "dadwow"
+    assignees:
+      - "dadwow"
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps-dev)"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "automated"
+    
+    # Grouping strategies
+    groups:
+      # Group all production dependencies
+      production-dependencies:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "@types/*"
+          - "eslint*"
+          - "prettier*"
+          - "jest*"
+        dependency-type: "production"
+      
+      # Group all development dependencies
+      development-dependencies:
+        patterns:
+          - "*"
+        dependency-type: "development"
+      
+      # Testing framework updates
+      testing:
+        patterns:
+          - "jest"
+          - "jest-*"
+          - "@types/jest"
+    
+    # Versioning strategy
+    versioning-strategy: "increase"
+    
+    # Ignore specific dependencies
+    ignore:
+      # Ignore major version updates for stable packages
+      - dependency-name: "electron"
+        update-types: ["version-update:semver-major"]
+      
+    # Auto-merge minor and patch updates for dev dependencies
+    pull-request-branch-name:
+      separator: "/"
+
+  # Enable version updates for GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "dadwow"
+    commit-message:
+      prefix: "chore(ci)"
+      include: "scope"
+    labels:
+      - "ci/cd"
+      - "dependencies"
+      - "automated"
