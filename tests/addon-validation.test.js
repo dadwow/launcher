@@ -53,7 +53,7 @@ async function validateAddonRepo(owner, repo) {
                             tocFiles: dirTocFiles.map(f => f.name)
                         });
                     }
-                } catch (err) {
+                } catch (_err) {
                     // Silent error handling during tests
                 }
             }
