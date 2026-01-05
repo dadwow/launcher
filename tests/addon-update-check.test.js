@@ -27,7 +27,8 @@ describe('Addon Update Check Tests', () => {
         ];
 
         // Mock GitHub API responses
-        axios.get = jest.fn()
+        axios.get = jest
+            .fn()
             .mockResolvedValueOnce({
                 data: { default_branch: 'main' }
             })
@@ -56,25 +57,26 @@ describe('Addon Update Check Tests', () => {
             });
 
         // Mock stored commit SHAs
-        fs.pathExists = jest.fn()
-            .mockResolvedValueOnce(true)  // ElvUI .github-commit exists
+        fs.pathExists = jest
+            .fn()
+            .mockResolvedValueOnce(true) // ElvUI .github-commit exists
             .mockResolvedValueOnce(true); // Details .github-commit exists
-        
-        fs.readFile = jest.fn()
+
+        fs.readFile = jest
+            .fn()
             .mockResolvedValueOnce('abc123old') // ElvUI old commit
             .mockResolvedValueOnce('def456new'); // Details same commit (no update)
 
-        const checkAddonUpdates = async (addons) => {
+        const checkAddonUpdates = async addons => {
             const updates = [];
 
             for (const addon of addons) {
                 const [owner, repo] = addon.githubRepo.split('/');
 
                 // Get repo info
-                const repoInfo = await axios.get(
-                    `https://api.github.com/repos/${owner}/${repo}`,
-                    { headers: { 'User-Agent': 'WoW-Launcher' } }
-                );
+                const repoInfo = await axios.get(`https://api.github.com/repos/${owner}/${repo}`, {
+                    headers: { 'User-Agent': 'WoW-Launcher' }
+                });
                 const defaultBranch = repoInfo.data.default_branch;
 
                 // Get latest commit
@@ -116,14 +118,17 @@ describe('Addon Update Check Tests', () => {
     });
 
     test('should handle addons without stored commit info', async () => {
-        const mockAddons = [{
-            name: 'NewAddon',
-            path: '/wow/Interface/AddOns/NewAddon',
-            githubRepo: 'Author/NewAddon',
-            version: '1.0'
-        }];
+        const mockAddons = [
+            {
+                name: 'NewAddon',
+                path: '/wow/Interface/AddOns/NewAddon',
+                githubRepo: 'Author/NewAddon',
+                version: '1.0'
+            }
+        ];
 
-        axios.get = jest.fn()
+        axios.get = jest
+            .fn()
             .mockResolvedValueOnce({ data: { default_branch: 'main' } })
             .mockResolvedValueOnce({
                 data: {
@@ -136,22 +141,20 @@ describe('Addon Update Check Tests', () => {
 
         fs.pathExists = jest.fn().mockResolvedValue(false); // No commit file
 
-        const checkAddonUpdates = async (addons) => {
+        const checkAddonUpdates = async addons => {
             const updates = [];
 
             for (const addon of addons) {
                 const [owner, repo] = addon.githubRepo.split('/');
 
-                const repoInfo = await axios.get(
-                    `https://api.github.com/repos/${owner}/${repo}`
-                );
+                const repoInfo = await axios.get(`https://api.github.com/repos/${owner}/${repo}`);
                 const commits = await axios.get(
                     `https://api.github.com/repos/${owner}/${repo}/commits/${repoInfo.data.default_branch}`
                 );
 
                 const commitFile = path.join(addon.path, '.github-commit');
-                const currentCommit = await fs.pathExists(commitFile) 
-                    ? await fs.readFile(commitFile, 'utf8') 
+                const currentCommit = (await fs.pathExists(commitFile))
+                    ? await fs.readFile(commitFile, 'utf8')
                     : null;
 
                 updates.push({
@@ -170,16 +173,18 @@ describe('Addon Update Check Tests', () => {
     });
 
     test('should handle GitHub API errors gracefully', async () => {
-        const mockAddons = [{
-            name: 'ErrorAddon',
-            path: '/wow/Interface/AddOns/ErrorAddon',
-            githubRepo: 'Author/ErrorAddon',
-            version: '1.0'
-        }];
+        const mockAddons = [
+            {
+                name: 'ErrorAddon',
+                path: '/wow/Interface/AddOns/ErrorAddon',
+                githubRepo: 'Author/ErrorAddon',
+                version: '1.0'
+            }
+        ];
 
         axios.get = jest.fn().mockRejectedValue(new Error('API rate limit exceeded'));
 
-        const checkAddonUpdates = async (addons) => {
+        const checkAddonUpdates = async addons => {
             const updates = [];
 
             for (const addon of addons) {
@@ -215,7 +220,7 @@ describe('Addon Update Check Tests', () => {
             }
         ];
 
-        const checkAddonUpdates = async (addons) => {
+        const checkAddonUpdates = async addons => {
             const updates = [];
 
             for (const addon of addons) {

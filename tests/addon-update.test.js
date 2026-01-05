@@ -12,7 +12,7 @@ describe('Addon Update Tests', () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
-        
+
         mockZip = {
             extract: jest.fn().mockResolvedValue(undefined),
             close: jest.fn().mockResolvedValue(undefined)
@@ -23,7 +23,8 @@ describe('Addon Update Tests', () => {
 
     test('should successfully update an addon', async () => {
         // Mock GitHub API responses
-        axios.get = jest.fn()
+        axios.get = jest
+            .fn()
             .mockResolvedValueOnce({
                 data: { default_branch: 'main' }
             })
@@ -50,16 +51,17 @@ describe('Addon Update Tests', () => {
         });
 
         fs.ensureDir = jest.fn().mockResolvedValue(undefined);
-        fs.readdir = jest.fn()
+        fs.readdir = jest
+            .fn()
             .mockResolvedValueOnce(['ElvUI-main'])
             .mockResolvedValueOnce(['ElvUI', 'ElvUI_Config'])
             .mockResolvedValueOnce(['ElvUI.toc'])
             .mockResolvedValueOnce(['ElvUI_Config.toc']);
-        
-        fs.stat = jest.fn().mockResolvedValue({ 
-            isDirectory: () => true 
+
+        fs.stat = jest.fn().mockResolvedValue({
+            isDirectory: () => true
         });
-        
+
         fs.pathExists = jest.fn().mockResolvedValue(true);
         fs.remove = jest.fn().mockResolvedValue(undefined);
         fs.move = jest.fn().mockResolvedValue(undefined);
@@ -69,10 +71,9 @@ describe('Addon Update Tests', () => {
             const [owner, repo] = githubRepo.split('/');
 
             // Get repo info
-            const repoInfo = await axios.get(
-                `https://api.github.com/repos/${owner}/${repo}`,
-                { headers: { 'User-Agent': 'WoW-Launcher' } }
-            );
+            const repoInfo = await axios.get(`https://api.github.com/repos/${owner}/${repo}`, {
+                headers: { 'User-Agent': 'WoW-Launcher' }
+            });
             const defaultBranch = repoInfo.data.default_branch;
 
             // Download latest version
@@ -88,7 +89,7 @@ describe('Addon Update Tests', () => {
             const writer = fs.createWriteStream(zipPath);
             response.data.pipe(writer);
 
-            await new Promise((resolve) => {
+            await new Promise(resolve => {
                 writer.on('finish', resolve);
             });
 
@@ -109,7 +110,7 @@ describe('Addon Update Tests', () => {
             for (const item of allFiles) {
                 const itemPath = path.join(sourcePath, item);
                 const itemStat = await fs.stat(itemPath);
-                
+
                 if (itemStat.isDirectory()) {
                     const subFiles = await fs.readdir(itemPath);
                     if (subFiles.some(file => file.endsWith('.toc'))) {
@@ -135,14 +136,10 @@ describe('Addon Update Tests', () => {
                 await fs.move(addonSourcePath, addonTargetPath);
 
                 // Update metadata
-                await fs.writeFile(
-                    path.join(addonTargetPath, '.github-repo'),
-                    githubRepo,
-                    'utf8'
-                );
+                await fs.writeFile(path.join(addonTargetPath, '.github-repo'), githubRepo, 'utf8');
 
                 // Get and save latest commit
-                const commitsResponse = await axios.get(
+                await axios.get(
                     `https://api.github.com/repos/${owner}/${repo}/commits/${defaultBranch}`,
                     { headers: { 'User-Agent': 'WoW-Launcher' } }
                 );
@@ -173,7 +170,8 @@ describe('Addon Update Tests', () => {
     });
 
     test('should preserve addon settings during update', async () => {
-        axios.get = jest.fn()
+        axios.get = jest
+            .fn()
             .mockResolvedValueOnce({ data: { default_branch: 'main' } })
             .mockResolvedValueOnce({ data: { sha: 'abc123' } });
 
@@ -191,20 +189,21 @@ describe('Addon Update Tests', () => {
         });
 
         // Mock WTF folder structure (SavedVariables)
-        const wtfPath = '/wow/WTF/Account/ACCOUNT/SavedVariables';
-        fs.pathExists = jest.fn()
-            .mockResolvedValueOnce(true)  // Old addon exists
+        fs.pathExists = jest
+            .fn()
+            .mockResolvedValueOnce(true) // Old addon exists
             .mockResolvedValueOnce(true); // SavedVariables exists
-        
-        fs.readdir = jest.fn()
+
+        fs.readdir = jest
+            .fn()
             .mockResolvedValueOnce(['ElvUI-main'])
             .mockResolvedValueOnce(['ElvUI'])
             .mockResolvedValueOnce(['ElvUI.toc']);
-        
-        fs.stat = jest.fn().mockResolvedValue({ 
-            isDirectory: () => true 
+
+        fs.stat = jest.fn().mockResolvedValue({
+            isDirectory: () => true
         });
-        
+
         fs.ensureDir = jest.fn().mockResolvedValue(undefined);
         fs.remove = jest.fn().mockResolvedValue(undefined);
         fs.move = jest.fn().mockResolvedValue(undefined);
@@ -213,7 +212,7 @@ describe('Addon Update Tests', () => {
         const updateAddon = async (githubRepo, installPath) => {
             // Update logic...
             const addonPath = path.join(installPath, 'Interface', 'AddOns', 'ElvUI');
-            
+
             // Remove old addon files (but WTF/SavedVariables remain untouched)
             if (await fs.pathExists(addonPath)) {
                 await fs.remove(addonPath);
@@ -229,18 +228,14 @@ describe('Addon Update Tests', () => {
 
         expect(result.success).toBe(true);
         // Verify we only removed addon folder, not WTF folder
-        expect(fs.remove).toHaveBeenCalledWith(
-            expect.stringContaining('Interface/AddOns/ElvUI')
-        );
-        expect(fs.remove).not.toHaveBeenCalledWith(
-            expect.stringContaining('WTF')
-        );
+        expect(fs.remove).toHaveBeenCalledWith(expect.stringContaining('Interface/AddOns/ElvUI'));
+        expect(fs.remove).not.toHaveBeenCalledWith(expect.stringContaining('WTF'));
     });
 
     test('should handle update errors gracefully', async () => {
         axios.get = jest.fn().mockRejectedValue(new Error('Network timeout'));
 
-        const updateAddon = async (githubRepo, installPath) => {
+        const updateAddon = async (githubRepo, _installPath) => {
             try {
                 const [owner, repo] = githubRepo.split('/');
                 await axios.get(`https://api.github.com/repos/${owner}/${repo}`);
@@ -257,7 +252,8 @@ describe('Addon Update Tests', () => {
     });
 
     test('should cleanup temporary files after update', async () => {
-        axios.get = jest.fn()
+        axios.get = jest
+            .fn()
             .mockResolvedValueOnce({ data: { default_branch: 'main' } })
             .mockResolvedValueOnce({ data: { sha: 'abc' } });
 
@@ -275,7 +271,8 @@ describe('Addon Update Tests', () => {
         });
 
         fs.ensureDir = jest.fn().mockResolvedValue(undefined);
-        fs.readdir = jest.fn()
+        fs.readdir = jest
+            .fn()
             .mockResolvedValueOnce(['addon-main'])
             .mockResolvedValueOnce(['Addon']);
         fs.stat = jest.fn().mockResolvedValue({ isDirectory: () => true });
@@ -284,7 +281,7 @@ describe('Addon Update Tests', () => {
         fs.remove = jest.fn().mockResolvedValue(undefined);
         fs.writeFile = jest.fn().mockResolvedValue(undefined);
 
-        const updateAddon = async (githubRepo, installPath) => {
+        const updateAddon = async (_githubRepo, _installPath) => {
             const zipPath = '/tmp/addon-update.zip';
             const tempExtractPath = '/tmp/addon-extract-123';
 

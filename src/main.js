@@ -7,7 +7,7 @@ const StreamZip = require('node-stream-zip');
 const { spawn } = require('child_process');
 
 // Handle uncaught exceptions (especially EPIPE errors from broken pipes)
-process.on('uncaughtException', (error) => {
+process.on('uncaughtException', error => {
     // Ignore EPIPE errors (broken pipe when stdout/stderr is closed)
     if (error.code === 'EPIPE') {
         return;
@@ -16,7 +16,7 @@ process.on('uncaughtException', (error) => {
 });
 
 // Handle unhandled promise rejections
-process.on('unhandledRejection', (reason, promise) => {
+process.on('unhandledRejection', (reason, _promise) => {
     console.error('Unhandled promise rejection:', reason);
 });
 
@@ -43,10 +43,10 @@ if (process.platform === 'win32') {
 // Load .env from multiple possible locations
 const dotenv = require('dotenv');
 const envPaths = [
-    path.join(__dirname, '.env'),                    // Development: src/.env
-    path.join(__dirname, '..', '.env'),              // Development: root/.env
-    path.join(process.resourcesPath, '.env'),        // Production: resources/.env
-    path.join(app.getAppPath(), '.env')              // Production: app/.env
+    path.join(__dirname, '.env'), // Development: src/.env
+    path.join(__dirname, '..', '.env'), // Development: root/.env
+    path.join(process.resourcesPath, '.env'), // Production: resources/.env
+    path.join(app.getAppPath(), '.env') // Production: app/.env
 ];
 
 let envLoaded = false;
@@ -68,7 +68,7 @@ if (!envLoaded) {
 let mainWindow;
 let optionsWindow;
 let platformManager;
-let downloadState = {
+const downloadState = {
     isDownloading: false,
     isPaused: false,
     controller: null,
@@ -92,7 +92,8 @@ const config = {
     serverName: process.env.SERVER_NAME || 'WoW Server',
     defaultRealm: process.env.DEFAULT_REALM || 'logon.server.com',
     downloadUrl: process.env.CLIENT_DOWNLOAD_URL || '',
-    installPath: process.env.WOW_INSTALL_PATH || path.join(os.homedir(), 'Documents', 'World of Warcraft')
+    installPath:
+        process.env.WOW_INSTALL_PATH || path.join(os.homedir(), 'Documents', 'World of Warcraft')
 };
 
 console.log('Launcher configuration:', {
@@ -111,7 +112,7 @@ autoUpdater.on('checking-for-update', () => {
     }
 });
 
-autoUpdater.on('update-available', (info) => {
+autoUpdater.on('update-available', info => {
     console.log('Update available:', info.version);
     if (mainWindow) {
         mainWindow.webContents.send('update-status', {
@@ -121,14 +122,14 @@ autoUpdater.on('update-available', (info) => {
     }
 });
 
-autoUpdater.on('update-not-available', (info) => {
+autoUpdater.on('update-not-available', _info => {
     console.log('Update not available');
     if (mainWindow) {
         mainWindow.webContents.send('update-status', { status: 'not-available' });
     }
 });
 
-autoUpdater.on('error', (err) => {
+autoUpdater.on('error', err => {
     console.error('Update error:', err);
     if (mainWindow) {
         mainWindow.webContents.send('update-status', {
@@ -138,7 +139,7 @@ autoUpdater.on('error', (err) => {
     }
 });
 
-autoUpdater.on('download-progress', (progressObj) => {
+autoUpdater.on('download-progress', progressObj => {
     if (mainWindow) {
         mainWindow.webContents.send('update-status', {
             status: 'downloading',
@@ -149,7 +150,7 @@ autoUpdater.on('download-progress', (progressObj) => {
     }
 });
 
-autoUpdater.on('update-downloaded', (info) => {
+autoUpdater.on('update-downloaded', info => {
     console.log('Update downloaded');
     if (mainWindow) {
         mainWindow.webContents.send('update-status', {
@@ -193,11 +194,14 @@ function createWindow() {
     console.log('Window created, loading index.html...');
 
     // Load the app
-    mainWindow.loadFile(path.join(__dirname, 'index.html')).then(() => {
-        console.log('index.html loaded successfully');
-    }).catch(err => {
-        console.error('Failed to load index.html:', err);
-    });
+    mainWindow
+        .loadFile(path.join(__dirname, 'index.html'))
+        .then(() => {
+            console.log('index.html loaded successfully');
+        })
+        .catch(err => {
+            console.error('Failed to load index.html:', err);
+        });
 
     // Show window when ready to prevent visual flash
     mainWindow.once('ready-to-show', () => {
@@ -359,56 +363,63 @@ function createMenu() {
 }
 
 // App event handlers
-app.whenReady().then(() => {
-    try {
-        // Register as handler for wow:// protocol URLs
-        if (app.setAsDefaultProtocolClient) {
-            app.setAsDefaultProtocolClient('wow');
-        }
-
-        // Initialize platform manager
-        console.log('Initializing platform manager...');
-        platformManager = new PlatformManager();
-        console.log('Platform manager initialized');
-
-        createWindow();
-        createMenu();
-
-        // Check for updates after a short delay (2 seconds) to let the app fully load
-        setTimeout(() => {
-            if (!config.devMode && mainWindow) {
-                // Notify UI that we're checking for updates (show loading state)
-                mainWindow.webContents.send('update-check-starting');
-
-                // Silently check for updates - no notifications
-                autoUpdater.checkForUpdates().catch(err => {
-                    // Suppress update check errors - don't notify user
-                    console.error('Auto-updater check failed (suppressed):', err.message);
-                }).finally(() => {
-                    // Always re-enable UI after check completes (success or failure)
-                    if (mainWindow) {
-                        mainWindow.webContents.send('update-check-complete');
-                    }
-                });
+app.whenReady()
+    .then(() => {
+        try {
+            // Register as handler for wow:// protocol URLs
+            if (app.setAsDefaultProtocolClient) {
+                app.setAsDefaultProtocolClient('wow');
             }
-        }, 2000);
-    } catch (error) {
-        console.error('Failed to initialize application:', error);
-        dialog.showErrorBox('Initialization Error',
-            `Failed to start the launcher.\n\nError: ${error.message}\n\nPlease check the console logs for details.`);
-        app.quit();
-    }
 
-    app.on('activate', () => {
-        // On macOS, re-create window when dock icon is clicked
-        if (BrowserWindow.getAllWindows().length === 0) {
+            // Initialize platform manager
+            console.log('Initializing platform manager...');
+            platformManager = new PlatformManager();
+            console.log('Platform manager initialized');
+
             createWindow();
+            createMenu();
+
+            // Check for updates after a short delay (2 seconds) to let the app fully load
+            setTimeout(() => {
+                if (!config.devMode && mainWindow) {
+                    // Notify UI that we're checking for updates (show loading state)
+                    mainWindow.webContents.send('update-check-starting');
+
+                    // Silently check for updates - no notifications
+                    autoUpdater
+                        .checkForUpdates()
+                        .catch(err => {
+                            // Suppress update check errors - don't notify user
+                            console.error('Auto-updater check failed (suppressed):', err.message);
+                        })
+                        .finally(() => {
+                            // Always re-enable UI after check completes (success or failure)
+                            if (mainWindow) {
+                                mainWindow.webContents.send('update-check-complete');
+                            }
+                        });
+                }
+            }, 2000);
+        } catch (error) {
+            console.error('Failed to initialize application:', error);
+            dialog.showErrorBox(
+                'Initialization Error',
+                `Failed to start the launcher.\n\nError: ${error.message}\n\nPlease check the console logs for details.`
+            );
+            app.quit();
         }
+
+        app.on('activate', () => {
+            // On macOS, re-create window when dock icon is clicked
+            if (BrowserWindow.getAllWindows().length === 0) {
+                createWindow();
+            }
+        });
+    })
+    .catch(error => {
+        console.error('App failed to initialize:', error);
+        app.quit();
     });
-}).catch(error => {
-    console.error('App failed to initialize:', error);
-    app.quit();
-});
 
 app.on('window-all-closed', () => {
     // On macOS, keep app running even when all windows are closed
@@ -467,12 +478,12 @@ ipcMain.handle('install-update', () => {
 });
 
 // Window controls for frameless window
-ipcMain.handle('window-minimize', (event) => {
+ipcMain.handle('window-minimize', event => {
     const window = BrowserWindow.fromWebContents(event.sender);
     if (window) window.minimize();
 });
 
-ipcMain.handle('window-maximize', (event) => {
+ipcMain.handle('window-maximize', event => {
     const window = BrowserWindow.fromWebContents(event.sender);
     if (window) {
         if (window.isMaximized()) {
@@ -483,7 +494,7 @@ ipcMain.handle('window-maximize', (event) => {
     }
 });
 
-ipcMain.handle('window-close', (event) => {
+ipcMain.handle('window-close', event => {
     const window = BrowserWindow.fromWebContents(event.sender);
     if (window) window.close();
 });
@@ -538,9 +549,11 @@ async function validateDownloadUrl(url) {
         });
 
         // Check if it's likely a zip file
-        if (!contentType.includes('application/zip') &&
+        if (
+            !contentType.includes('application/zip') &&
             !contentType.includes('application/octet-stream') &&
-            !contentType.includes('application/x-zip-compressed')) {
+            !contentType.includes('application/x-zip-compressed')
+        ) {
             console.warn('Warning: Content-Type does not indicate a zip file:', contentType);
         }
 
@@ -593,7 +606,7 @@ ipcMain.handle('start-download', async (event, url, destination) => {
             signal: downloadState.controller.signal,
             timeout: 30000, // 30 second timeout for initial connection
             maxRedirects: 10, // Allow redirects (for bit.ly URLs)
-            validateStatus: (status) => status >= 200 && status < 300,
+            validateStatus: status => status >= 200 && status < 300,
             headers: {
                 'User-Agent': 'PlusCraft-Launcher/1.0'
             }
@@ -609,7 +622,9 @@ ipcMain.handle('start-download', async (event, url, destination) => {
         downloadState.response = response;
 
         if (downloadState.totalBytes === 0) {
-            console.warn('Warning: Content-Length header not present, progress tracking may be limited');
+            console.warn(
+                'Warning: Content-Length header not present, progress tracking may be limited'
+            );
         }
 
         const writer = fs.createWriteStream(zipPath);
@@ -619,7 +634,7 @@ ipcMain.handle('start-download', async (event, url, destination) => {
         let lastProgressTime = Date.now();
 
         // Handle stream errors
-        writer.on('error', (error) => {
+        writer.on('error', error => {
             console.error('Write stream error:', error);
             downloadState.isDownloading = false;
             if (!downloadState.controller.signal.aborted) {
@@ -629,7 +644,7 @@ ipcMain.handle('start-download', async (event, url, destination) => {
             }
         });
 
-        response.data.on('data', (chunk) => {
+        response.data.on('data', chunk => {
             if (!downloadState.isPaused && downloadState.isDownloading) {
                 try {
                     writer.write(chunk);
@@ -638,8 +653,12 @@ ipcMain.handle('start-download', async (event, url, destination) => {
 
                     // Throttle progress updates to avoid overwhelming the UI
                     const now = Date.now();
-                    if (now - lastProgressTime > 100) { // Update every 100ms
-                        const percent = downloadState.totalBytes > 0 ? (downloadedBytes / downloadState.totalBytes) * 100 : 0;
+                    if (now - lastProgressTime > 100) {
+                        // Update every 100ms
+                        const percent =
+                            downloadState.totalBytes > 0
+                                ? (downloadedBytes / downloadState.totalBytes) * 100
+                                : 0;
                         const elapsed = (now - downloadState.startTime) / 1000;
                         const bytesPerSecond = elapsed > 0 ? downloadedBytes / elapsed : 0;
 
@@ -667,7 +686,7 @@ ipcMain.handle('start-download', async (event, url, destination) => {
 
             try {
                 await new Promise((resolve, reject) => {
-                    writer.end((error) => {
+                    writer.end(error => {
                         if (error) {
                             reject(error);
                         } else {
@@ -711,7 +730,7 @@ ipcMain.handle('start-download', async (event, url, destination) => {
             }
         });
 
-        response.data.on('error', (error) => {
+        response.data.on('error', error => {
             console.error('Download stream error:', error);
             downloadState.isDownloading = false;
 
@@ -725,18 +744,18 @@ ipcMain.handle('start-download', async (event, url, destination) => {
             }
 
             if (!downloadState.controller.signal.aborted) {
-                const errorMessage = error.code === 'ENOTFOUND'
-                    ? 'Network error: Unable to connect to download server'
-                    : error.code === 'ECONNRESET'
-                        ? 'Connection was reset by the server'
-                        : error.code === 'ETIMEDOUT'
+                const errorMessage =
+                    error.code === 'ENOTFOUND'
+                        ? 'Network error: Unable to connect to download server'
+                        : error.code === 'ECONNRESET'
+                          ? 'Connection was reset by the server'
+                          : error.code === 'ETIMEDOUT'
                             ? 'Download timed out'
                             : 'Download error: ' + error.message;
 
                 mainWindow.webContents.send('download-error', { message: errorMessage });
             }
         });
-
     } catch (error) {
         console.error('Download initialization error:', error);
         downloadState.isDownloading = false;
@@ -804,19 +823,22 @@ ipcMain.handle('validate-addon-repo', async (event, owner, repo) => {
         const repoData = repoResponse.data;
 
         // Get repo contents to check for .toc files
-        const contentsResponse = await axios.get(`https://api.github.com/repos/${owner}/${repo}/contents`, {
-            headers: { 'User-Agent': 'PlusCraft-Launcher' }
-        });
+        const contentsResponse = await axios.get(
+            `https://api.github.com/repos/${owner}/${repo}/contents`,
+            {
+                headers: { 'User-Agent': 'PlusCraft-Launcher' }
+            }
+        );
 
         const contents = contentsResponse.data;
 
         // Check for .toc files in root
-        const hasTocInRoot = contents.some(file =>
-            file.name.endsWith('.toc') && file.type === 'file'
+        const hasTocInRoot = contents.some(
+            file => file.name.endsWith('.toc') && file.type === 'file'
         );
 
         let tocFiles = [];
-        let addonFolders = [];
+        const addonFolders = [];
 
         if (hasTocInRoot) {
             // Root is the addon
@@ -825,7 +847,8 @@ ipcMain.handle('validate-addon-repo', async (event, owner, repo) => {
             // Check subdirectories for .toc files
             const directories = contents.filter(item => item.type === 'dir');
 
-            for (const dir of directories.slice(0, 10)) { // Limit to first 10 dirs
+            for (const dir of directories.slice(0, 10)) {
+                // Limit to first 10 dirs
                 try {
                     const dirContentsResponse = await axios.get(dir.url, {
                         headers: { 'User-Agent': 'PlusCraft-Launcher' }
@@ -848,36 +871,45 @@ ipcMain.handle('validate-addon-repo', async (event, owner, repo) => {
         // Get README
         let readme = null;
         try {
-            const readmeResponse = await axios.get(`https://api.github.com/repos/${owner}/${repo}/readme`, {
-                headers: {
-                    'User-Agent': 'PlusCraft-Launcher',
-                    'Accept': 'application/vnd.github.v3.raw'
+            const readmeResponse = await axios.get(
+                `https://api.github.com/repos/${owner}/${repo}/readme`,
+                {
+                    headers: {
+                        'User-Agent': 'PlusCraft-Launcher',
+                        Accept: 'application/vnd.github.v3.raw'
+                    }
                 }
-            });
+            );
             readme = readmeResponse.data;
-        } catch (err) {
+        } catch {
             console.log('No README found');
         }
 
         // Get latest release
         let latestRelease = null;
         try {
-            const releaseResponse = await axios.get(`https://api.github.com/repos/${owner}/${repo}/releases/latest`, {
-                headers: { 'User-Agent': 'PlusCraft-Launcher' }
-            });
+            const releaseResponse = await axios.get(
+                `https://api.github.com/repos/${owner}/${repo}/releases/latest`,
+                {
+                    headers: { 'User-Agent': 'PlusCraft-Launcher' }
+                }
+            );
             latestRelease = releaseResponse.data;
-        } catch (err) {
+        } catch {
             console.log('No releases found');
         }
 
         // Get recent releases
         let releases = [];
         try {
-            const releasesResponse = await axios.get(`https://api.github.com/repos/${owner}/${repo}/releases?per_page=5`, {
-                headers: { 'User-Agent': 'PlusCraft-Launcher' }
-            });
+            const releasesResponse = await axios.get(
+                `https://api.github.com/repos/${owner}/${repo}/releases?per_page=5`,
+                {
+                    headers: { 'User-Agent': 'PlusCraft-Launcher' }
+                }
+            );
             releases = releasesResponse.data;
-        } catch (err) {
+        } catch {
             console.log('No releases found');
         }
 
@@ -1013,11 +1045,12 @@ async function extractZipFile(zipPath, extractPath) {
         const extractedContents = await fs.readdir(extractPath);
 
         // Filter out hidden files and zip files
-        const visibleContents = extractedContents.filter(item =>
-            !item.startsWith('.') && !item.endsWith('.zip')
+        const visibleContents = extractedContents.filter(
+            item => !item.startsWith('.') && !item.endsWith('.zip')
         );
 
-        // If there's only one visible item and it's a directory, check if we should move its contents up
+        // If there's only one visible item and it's a directory,
+        // check if we should move its contents up
         if (visibleContents.length === 1) {
             const singleItem = visibleContents[0];
             const singleItemPath = path.join(extractPath, singleItem);
@@ -1028,13 +1061,13 @@ async function extractZipFile(zipPath, extractPath) {
                 if (stat.isDirectory()) {
                     // Check if this folder contains WoW.exe
                     const nestedContents = await fs.readdir(singleItemPath);
-                    const hasWowExe = nestedContents.some(item =>
-                        item.toLowerCase() === 'wow.exe'
-                    );
+                    const hasWowExe = nestedContents.some(item => item.toLowerCase() === 'wow.exe');
 
                     // Only move contents up if this appears to be the WoW client folder
                     if (hasWowExe) {
-                        console.log(`Found nested WoW client in folder: ${singleItem}, moving contents up...`);
+                        console.log(
+                            `Found nested WoW client in folder: ${singleItem}, moving contents up...`
+                        );
 
                         // Move contents from nested folder to parent
                         for (const item of nestedContents) {
@@ -1047,7 +1080,9 @@ async function extractZipFile(zipPath, extractPath) {
                         await fs.remove(singleItemPath);
                         console.log('Successfully flattened nested directory structure');
                     } else {
-                        console.log(`Single folder found but doesn't contain WoW.exe, leaving structure as-is`);
+                        console.log(
+                            "Single folder found but doesn't contain WoW.exe, leaving structure as-is"
+                        );
                     }
                 }
             } catch (statError) {
@@ -1092,9 +1127,9 @@ ipcMain.handle('install-addon-from-github', async (event, owner, repo, installPa
 
 // Check if git is available on the system
 async function checkGitAvailable() {
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
         const gitCheck = spawn('git', ['--version']);
-        gitCheck.on('close', (code) => {
+        gitCheck.on('close', code => {
             resolve(code === 0);
         });
         gitCheck.on('error', () => {
@@ -1119,15 +1154,15 @@ async function installAddonWithGit(owner, repo, addonPath) {
     await new Promise((resolve, reject) => {
         const gitClone = spawn('git', ['clone', '--depth', '1', repoUrl, tempClonePath]);
 
-        gitClone.stdout.on('data', (data) => {
+        gitClone.stdout.on('data', data => {
             console.log(`git: ${data}`);
         });
 
-        gitClone.stderr.on('data', (data) => {
+        gitClone.stderr.on('data', data => {
             console.log(`git: ${data}`);
         });
 
-        gitClone.on('close', (code) => {
+        gitClone.on('close', code => {
             if (code === 0) {
                 resolve();
             } else {
@@ -1135,7 +1170,7 @@ async function installAddonWithGit(owner, repo, addonPath) {
             }
         });
 
-        gitClone.on('error', (error) => {
+        gitClone.on('error', error => {
             reject(error);
         });
     });
@@ -1216,7 +1251,9 @@ async function installAddonWithGit(owner, repo, addonPath) {
 
             return { success: true, addons: addonFolders };
         } else {
-            throw new Error('Could not find any .toc files. This does not appear to be a valid WoW addon.');
+            throw new Error(
+                'Could not find any .toc files. This does not appear to be a valid WoW addon.'
+            );
         }
     }
 }
@@ -1227,10 +1264,12 @@ async function installAddonWithArchive(owner, repo, addonPath) {
         // Get repository information to find the default branch
         let defaultBranch = 'main';
         try {
-            const repoInfoResponse = await axios.get(`https://api.github.com/repos/${owner}/${repo}`);
+            const repoInfoResponse = await axios.get(
+                `https://api.github.com/repos/${owner}/${repo}`
+            );
             defaultBranch = repoInfoResponse.data.default_branch || 'main';
             console.log(`Default branch for ${owner}/${repo}: ${defaultBranch}`);
-        } catch (error) {
+        } catch {
             console.log('Could not get repo info, trying common branches...');
         }
 
@@ -1265,7 +1304,7 @@ async function installAddonWithArchive(owner, repo, addonPath) {
                 branchUsed = branch;
                 console.log(`Successfully downloaded from branch: ${branch}`);
                 break;
-            } catch (error) {
+            } catch {
                 console.log(`Branch ${branch} not found, trying next...`);
                 if (await fs.pathExists(zipPath)) {
                     await fs.remove(zipPath);
@@ -1275,7 +1314,9 @@ async function installAddonWithArchive(owner, repo, addonPath) {
         }
 
         if (!branchUsed) {
-            throw new Error(`Could not find repository or it has no main/master branch. Tried: ${possibleBranches.join(', ')}`);
+            throw new Error(
+                `Could not find repository or it has no main/master branch. Tried: ${possibleBranches.join(', ')}`
+            );
         }
 
         // Extract the addon
@@ -1286,12 +1327,14 @@ async function installAddonWithArchive(owner, repo, addonPath) {
         const extractedContents = await fs.readdir(tempExtractPath);
         console.log('Extracted contents:', extractedContents);
 
-        const mainFolder = extractedContents.find(folder =>
-            folder.startsWith(`${repo}-`) || folder === repo
+        const mainFolder = extractedContents.find(
+            folder => folder.startsWith(`${repo}-`) || folder === repo
         );
 
         if (!mainFolder) {
-            throw new Error(`Could not find addon folder in extracted archive. Found: ${extractedContents.join(', ')}`);
+            throw new Error(
+                `Could not find addon folder in extracted archive. Found: ${extractedContents.join(', ')}`
+            );
         }
 
         const sourcePath = path.join(tempExtractPath, mainFolder);
@@ -1302,6 +1345,7 @@ async function installAddonWithArchive(owner, repo, addonPath) {
 
         // First, check if the root folder itself contains a .toc file (repo IS the addon)
         const rootTocFiles = sourceContents.filter(f => f.endsWith('.toc'));
+        let addonFolders = [];
 
         if (rootTocFiles.length > 0) {
             // The extracted folder itself is the addon
@@ -1318,7 +1362,7 @@ async function installAddonWithArchive(owner, repo, addonPath) {
             console.log(`Installed addon: ${repo}`);
         } else {
             // Check if there are multiple addon folders inside subdirectories
-            const addonFolders = [];
+            addonFolders = [];
             for (const item of sourceContents) {
                 const itemPath = path.join(sourcePath, item);
                 const stat = await fs.stat(itemPath);
@@ -1348,7 +1392,9 @@ async function installAddonWithArchive(owner, repo, addonPath) {
                 }
             } else {
                 // No .toc files found anywhere
-                throw new Error('Could not find any .toc files. This does not appear to be a valid WoW addon.');
+                throw new Error(
+                    'Could not find any .toc files. This does not appear to be a valid WoW addon.'
+                );
             }
         }
 
@@ -1622,11 +1668,16 @@ ipcMain.handle('get-installed-addons', async (event, installPath) => {
                 };
 
                 // Try to read addon information from .toc file
-                const tocFiles = (await fs.readdir(folderPath)).filter(file => file.endsWith('.toc'));
+                const tocFiles = (await fs.readdir(folderPath)).filter(file =>
+                    file.endsWith('.toc')
+                );
 
                 if (tocFiles.length > 0) {
                     try {
-                        const tocContent = await fs.readFile(path.join(folderPath, tocFiles[0]), 'utf8');
+                        const tocContent = await fs.readFile(
+                            path.join(folderPath, tocFiles[0]),
+                            'utf8'
+                        );
                         const titleMatch = tocContent.match(/## Title: (.+)/);
                         const versionMatch = tocContent.match(/## Version: (.+)/);
                         const notesMatch = tocContent.match(/## Notes: (.+)/);
@@ -1634,7 +1685,7 @@ ipcMain.handle('get-installed-addons', async (event, installPath) => {
                         if (titleMatch) addon.name = titleMatch[1].trim();
                         if (versionMatch) addon.version = versionMatch[1].trim();
                         if (notesMatch) addon.description = notesMatch[1].trim();
-                    } catch (tocError) {
+                    } catch {
                         // Ignore TOC reading errors
                     }
                 }
@@ -1645,7 +1696,7 @@ ipcMain.handle('get-installed-addons', async (event, installPath) => {
                     try {
                         const repoInfo = await fs.readFile(repoFile, 'utf8');
                         addon.githubRepo = repoInfo.trim();
-                    } catch (error) {
+                    } catch {
                         // Ignore
                     }
                 }
@@ -1655,7 +1706,6 @@ ipcMain.handle('get-installed-addons', async (event, installPath) => {
         }
 
         return addons;
-
     } catch (error) {
         console.error('Error getting installed addons:', error);
         return [];
@@ -1672,7 +1722,6 @@ ipcMain.handle('uninstall-addon', async (event, addonName, installPath) => {
         } else {
             return { success: false, error: 'Addon not found' };
         }
-
     } catch (error) {
         console.error('Addon uninstall error:', error);
         return { success: false, error: error.message };
@@ -1687,7 +1736,7 @@ ipcMain.handle('test-realm-connection', async (event, realmAddress) => {
         try {
             // Try to connect to the realm on port 8085 (AzerothCore worldserver port)
             // This is a basic connectivity test
-            const response = await axios({
+            await axios({
                 method: 'GET',
                 url: `http://${realmAddress}:8085`,
                 timeout: 5000,
@@ -1696,7 +1745,6 @@ ipcMain.handle('test-realm-connection', async (event, realmAddress) => {
 
             const ping = Date.now() - startTime;
             return { success: true, ping: ping };
-
         } catch (error) {
             if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
                 return { success: false, error: 'Cannot reach server' };
@@ -1708,7 +1756,6 @@ ipcMain.handle('test-realm-connection', async (event, realmAddress) => {
                 return { success: true, ping: ping, note: 'Server reachable' };
             }
         }
-
     } catch (error) {
         return { success: false, error: error.message };
     }
@@ -1745,7 +1792,7 @@ ipcMain.handle('get-wine-prefix-path', (event, installPath) => {
 });
 
 // Automatic Wine installation handlers
-ipcMain.handle('install-wine-automatically', async (event) => {
+ipcMain.handle('install-wine-automatically', async _event => {
     try {
         const result = await platformManager.installWineAutomatically((message, progress) => {
             mainWindow.webContents.send('wine-install-progress', { message, progress });
@@ -1774,19 +1821,6 @@ ipcMain.handle('apply-macos-patches', async (event, installPath) => {
         return { success: false, error: error.message };
     }
 });
-
-// Helper function to load settings
-async function loadSettingsFromFile() {
-    try {
-        const settingsPath = path.join(app.getPath('userData'), 'settings.json');
-        if (await fs.pathExists(settingsPath)) {
-            return await fs.readJson(settingsPath);
-        }
-        return {};
-    } catch (error) {
-        return {};
-    }
-}
 
 // Prevent multiple instances
 const gotTheLock = app.requestSingleInstanceLock();

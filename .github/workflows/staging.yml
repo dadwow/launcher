@@ -1,0 +1,202 @@
+name: Staging Build
+
+on:
+  push:
+    branches: [ staging ]
+  pull_request:
+    branches: [ staging ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  
+jobs:
+  validate:
+    name: Validate Staging Build
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linting
+        run: npm run lint
+
+      - name: Run tests
+        run: npm test
+
+      - name: Run security audit
+        run: npm audit --audit-level=moderate
+        continue-on-error: true
+
+  build-staging:
+    name: Build Staging (${{ matrix.platform }})
+    needs: validate
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+        include:
+          - os: macos-latest
+            platform: macOS
+            build-cmd: build:mac
+          - os: ubuntu-latest
+            platform: Linux
+            build-cmd: build:linux
+          - os: windows-latest
+            platform: Windows
+            build-cmd: build:win
+
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build for ${{ matrix.platform }}
+        run: npm run ${{ matrix.build-cmd }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload staging artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-${{ matrix.platform }}-${{ github.sha }}
+          path: |
+            dist/*.exe
+            dist/*.dmg
+            dist/*.AppImage
+            dist/*.deb
+            dist/*.tar.gz
+            dist/*.zip
+          retention-days: 14
+          if-no-files-found: error
+
+  create-pre-release:
+    name: Create Pre-Release
+    needs: build-staging
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get version from package.json
+        id: version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          PRE_VERSION="${VERSION}-staging.${SHORT_SHA}"
+          echo "version=$PRE_VERSION" >> $GITHUB_OUTPUT
+          echo "Pre-release version: $PRE_VERSION"
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: staging-artifacts
+
+      - name: Display artifacts
+        run: |
+          echo "=== Staging Artifacts ==="
+          ls -laR staging-artifacts/
+          echo "========================"
+
+      - name: Generate Staging Changelog
+        id: changelog
+        run: |
+          LAST_RELEASE=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          
+          if [ -z "$LAST_RELEASE" ]; then
+            echo "No previous release found"
+            LAST_RELEASE=$(git rev-list --max-parents=0 HEAD)
+          fi
+          
+          {
+            echo "## 🚧 Staging Build - DO NOT USE IN PRODUCTION"
+            echo ""
+            echo "**Version**: ${{ steps.version.outputs.version }}"
+            echo "**Commit**: \`${{ github.sha }}\`"
+            echo "**Branch**: \`staging\`"
+            echo "**Built**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo ""
+            echo "### ⚠️ Warning"
+            echo "This is a pre-release staging build for testing purposes only."
+            echo "Use at your own risk. For production use, download from official releases."
+            echo ""
+            echo "### 📝 Changes Since Last Release"
+            echo ""
+            git log $LAST_RELEASE..HEAD --pretty=format:"- %s (%h)" --no-merges | head -20
+            echo ""
+            echo ""
+            echo "### 🧪 Testing Checklist"
+            echo "- [ ] Installation works on all platforms"
+            echo "- [ ] Launcher starts successfully"
+            echo "- [ ] Download/update functionality works"
+            echo "- [ ] Addon management works"
+            echo "- [ ] No critical errors in console"
+          } > staging_changelog.txt
+
+      - name: Create or Update Pre-Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: staging-${{ github.sha }}
+          name: "🚧 Staging Build ${{ steps.version.outputs.version }}"
+          body_path: staging_changelog.txt
+          draft: false
+          prerelease: true
+          files: |
+            staging-artifacts/staging-Windows-*/PlusCraft-Launcher*.exe
+            staging-artifacts/staging-macOS-*/*.dmg
+            staging-artifacts/staging-macOS-*/*.zip
+            staging-artifacts/staging-Linux-*/*.AppImage
+            staging-artifacts/staging-Linux-*/*.deb
+            staging-artifacts/staging-Linux-*/*.tar.gz
+          fail_on_unmatched_files: true
+
+  staging-summary:
+    name: Staging Build Summary
+    needs: [validate, build-staging]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Generate summary
+        run: |
+          echo "## 🚧 Staging Build Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Validation | ${{ needs.validate.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build | ${{ needs.build-staging.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.validate.result }}" == "success" ] && [ "${{ needs.build-staging.result }}" == "success" ]; then
+            echo "### ✅ Staging build completed successfully!" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Ready for testing before merging to main." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ❌ Staging build failed!" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Please fix the issues before proceeding." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
