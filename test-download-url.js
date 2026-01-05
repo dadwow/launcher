@@ -34,15 +34,20 @@ async function testDownloadUrl() {
         console.log('   Content-Length:', headResponse.headers['content-length'], 'bytes');
 
         if (headResponse.headers['content-length']) {
-            const sizeMB = (parseInt(headResponse.headers['content-length']) / (1024 * 1024)).toFixed(2);
+            const sizeMB = (
+                parseInt(headResponse.headers['content-length']) /
+                (1024 * 1024)
+            ).toFixed(2);
             console.log('   Size:', sizeMB, 'MB');
         }
 
         // Check content type
         const contentType = headResponse.headers['content-type'] || '';
-        if (contentType.includes('application/zip') ||
+        if (
+            contentType.includes('application/zip') ||
             contentType.includes('application/octet-stream') ||
-            contentType.includes('application/x-zip-compressed')) {
+            contentType.includes('application/x-zip-compressed')
+        ) {
             console.log('✅ Content-Type indicates a downloadable file');
         } else {
             console.log('⚠️  Warning: Content-Type does not indicate a zip file:', contentType);
@@ -63,14 +68,14 @@ async function testDownloadUrl() {
             maxRedirects: 10,
             headers: {
                 'User-Agent': 'PlusCraft-Launcher/1.0',
-                'Range': 'bytes=0-1023' // Request only first 1KB
+                Range: 'bytes=0-1023' // Request only first 1KB
             }
         });
 
         let bytesReceived = 0;
 
         await new Promise((resolve, reject) => {
-            streamResponse.data.on('data', (chunk) => {
+            streamResponse.data.on('data', chunk => {
                 bytesReceived += chunk.length;
             });
 
@@ -78,7 +83,7 @@ async function testDownloadUrl() {
                 resolve();
             });
 
-            streamResponse.data.on('error', (error) => {
+            streamResponse.data.on('error', error => {
                 reject(error);
             });
 
@@ -92,7 +97,6 @@ async function testDownloadUrl() {
         console.log('   Received:', bytesReceived, 'bytes');
 
         console.log('\n✅ All tests passed! The download URL is valid and accessible.');
-
     } catch (error) {
         console.error('\n❌ Download URL test failed!');
         console.error('   Error:', error.message);

@@ -33,10 +33,14 @@ class PlatformManager {
 
     getPlatformName() {
         switch (this.platform) {
-            case 'win32': return 'Windows';
-            case 'darwin': return 'macOS';
-            case 'linux': return 'Linux';
-            default: return 'Unknown';
+            case 'win32':
+                return 'Windows';
+            case 'darwin':
+                return 'macOS';
+            case 'linux':
+                return 'Linux';
+            default:
+                return 'Unknown';
         }
     }
 
@@ -57,14 +61,36 @@ class PlatformManager {
                     path.join(homeDir, 'Applications', 'World of Warcraft'),
                     path.join('/Applications', 'World of Warcraft'),
                     path.join(homeDir, 'Documents', 'World of Warcraft'),
-                    path.join(homeDir, '.wine', 'drive_c', 'Program Files (x86)', 'World of Warcraft'),
-                    path.join(homeDir, 'Library', 'Application Support', 'CrossOver', 'Bottles', 'World of Warcraft', 'drive_c', 'Program Files (x86)', 'World of Warcraft')
+                    path.join(
+                        homeDir,
+                        '.wine',
+                        'drive_c',
+                        'Program Files (x86)',
+                        'World of Warcraft'
+                    ),
+                    path.join(
+                        homeDir,
+                        'Library',
+                        'Application Support',
+                        'CrossOver',
+                        'Bottles',
+                        'World of Warcraft',
+                        'drive_c',
+                        'Program Files (x86)',
+                        'World of Warcraft'
+                    )
                 ];
 
             case 'linux':
                 return [
                     path.join(homeDir, 'Games', 'world-of-warcraft'),
-                    path.join(homeDir, '.wine', 'drive_c', 'Program Files (x86)', 'World of Warcraft'),
+                    path.join(
+                        homeDir,
+                        '.wine',
+                        'drive_c',
+                        'Program Files (x86)',
+                        'World of Warcraft'
+                    ),
                     path.join(homeDir, '.local', 'share', 'lutris', 'runners', 'wine'),
                     path.join(homeDir, 'Documents', 'World of Warcraft')
                 ];
@@ -93,8 +119,14 @@ class PlatformManager {
                 '/Applications/CrossOver.app/Contents/SharedSupport/CrossOver/bin/wine64',
                 '/Applications/CrossOver.app/Contents/SharedSupport/CrossOver/bin/wine',
                 // Check for CrossOver installed in user Applications
-                path.join(os.homedir(), 'Applications/CrossOver.app/Contents/SharedSupport/CrossOver/bin/wine64'),
-                path.join(os.homedir(), 'Applications/CrossOver.app/Contents/SharedSupport/CrossOver/bin/wine')
+                path.join(
+                    os.homedir(),
+                    'Applications/CrossOver.app/Contents/SharedSupport/CrossOver/bin/wine64'
+                ),
+                path.join(
+                    os.homedir(),
+                    'Applications/CrossOver.app/Contents/SharedSupport/CrossOver/bin/wine'
+                )
             ];
 
             for (const crossoverPath of crossoverPaths) {
@@ -122,7 +154,7 @@ class PlatformManager {
                         version: await this.getWineVersion(check.command)
                     };
                 }
-            } catch (error) {
+            } catch {
                 // Command not found, continue checking
             }
         }
@@ -134,25 +166,25 @@ class PlatformManager {
         try {
             const { stdout } = await execAsync(`${wineCommand} --version`);
             return stdout.trim();
-        } catch (error) {
+        } catch {
             return 'unknown';
         }
     }
 
     // Wine prefix management (deprecated - kept for compatibility)
     // TurtleSilicon approach doesn't require Wine prefixes
-    getWinePrefixPath(installPath) {
+    getWinePrefixPath(_installPath) {
         // No longer used with TurtleSilicon-style launching
         return null;
     }
 
-    async createWinePrefix(prefixPath) {
+    async createWinePrefix(_prefixPath) {
         // No longer required with TurtleSilicon-style launching
         // Wine/CrossOver will handle configuration automatically
         return true;
     }
 
-    async installWineComponents(prefixPath, winePath) {
+    async installWineComponents(_prefixPath, _winePath) {
         // No longer required with TurtleSilicon-style launching
         // Wine/CrossOver will handle DirectX and dependencies automatically
         console.log('Wine components installation skipped (TurtleSilicon approach)');
@@ -186,10 +218,12 @@ class PlatformManager {
         return { success: true, process: wowProcess };
     }
 
-    async launchWoWWine(installPath, wineConfig) {
+    async launchWoWWine(installPath, _wineConfig) {
         const wine = await this.checkWineInstallation();
         if (!wine.installed) {
-            throw new Error('Windows compatibility layer not installed. Click "Install Compatibility Layer" to continue.');
+            throw new Error(
+                'Windows compatibility layer not installed. Click "Install Compatibility Layer" to continue.'
+            );
         }
 
         const wowExePath = path.join(installPath, 'WoW.exe');
@@ -210,14 +244,15 @@ class PlatformManager {
                 if (!patchesInstalled.rosettax87) missingComponents.push('rosettax87 service');
                 if (!patchesInstalled.wineloader2) missingComponents.push('patched wineloader2');
 
-                const errorDetails = patchesInstalled.errors.length > 0
-                    ? `\n\nErrors: ${patchesInstalled.errors.join(', ')}`
-                    : '';
+                const errorDetails =
+                    patchesInstalled.errors.length > 0
+                        ? `\n\nErrors: ${patchesInstalled.errors.join(', ')}`
+                        : '';
 
                 throw new Error(
-                    `Failed to install TurtleSilicon patches for Apple Silicon.\n\n` +
-                    `Missing: ${missingComponents.join(', ')}${errorDetails}\n\n` +
-                    `WoW 3.3.5a requires these patches to prevent ILLEGAL_INSTRUCTION crashes on Apple Silicon Macs.`
+                    'Failed to install TurtleSilicon patches for Apple Silicon.\n\n' +
+                        `Missing: ${missingComponents.join(', ')}${errorDetails}\n\n` +
+                        'WoW 3.3.5a requires these patches to prevent ILLEGAL_INSTRUCTION crashes on Apple Silicon Macs.'
                 );
             }
 
@@ -232,7 +267,10 @@ class PlatformManager {
         // For CrossOver on macOS, check for wineloader2 (optional enhancement)
         if (this.isMacOS && wine.type === 'crossover') {
             const crossoverApp = wine.path.includes('CrossOver.app')
-                ? wine.path.substring(0, wine.path.indexOf('CrossOver.app') + 'CrossOver.app'.length)
+                ? wine.path.substring(
+                      0,
+                      wine.path.indexOf('CrossOver.app') + 'CrossOver.app'.length
+                  )
                 : '/Applications/CrossOver.app';
 
             const wineloader2Path = path.join(
@@ -283,7 +321,6 @@ class PlatformManager {
     // These patches solve the x87 FPU limitation when running x86 WoW through Rosetta 2
     // NOT applicable to Windows (native) or Linux (x86_64 Wine)
     async installTurtleSiliconPatches(installPath, wine) {
-        const { app } = require('electron');
         const { execSync } = require('child_process');
 
         const result = {
@@ -351,10 +388,14 @@ class PlatformManager {
 
             if (await fs.pathExists(winerosettaSrc)) {
                 // Backup original DivxDecoder.dll if it exists and isn't already backed up
-                if (await fs.pathExists(divxDecoderPath) && !await fs.pathExists(divxBackupPath)) {
+                if (
+                    (await fs.pathExists(divxDecoderPath)) &&
+                    !(await fs.pathExists(divxBackupPath))
+                ) {
                     const stats = await fs.stat(divxDecoderPath);
                     // Only backup if it's the original 404KB codec DLL (not already winerosetta)
-                    if (stats.size > 100000) { // Original is ~404KB, winerosetta is ~11KB
+                    if (stats.size > 100000) {
+                        // Original is ~404KB, winerosetta is ~11KB
                         await fs.copy(divxDecoderPath, divxBackupPath, { overwrite: false });
                         console.log(`✅ Backed up original DivxDecoder.dll (${stats.size} bytes)`);
                     }
@@ -362,9 +403,11 @@ class PlatformManager {
 
                 // Replace DivxDecoder.dll with winerosetta.dll (direct import method)
                 await fs.copy(winerosettaSrc, divxDecoderPath, { overwrite: true });
-                console.log(`✅ Installed winerosetta.dll as DivxDecoder.dll (NEW performant method)`);
-                console.log(`   🎯 Direct WoW import (no DLL injection overhead)`);
-                console.log(`   ⚡ ~3x faster than old libDllLdr.dll method`);
+                console.log(
+                    '✅ Installed winerosetta.dll as DivxDecoder.dll (NEW performant method)'
+                );
+                console.log('   🎯 Direct WoW import (no DLL injection overhead)');
+                console.log('   ⚡ ~3x faster than old libDllLdr.dll method');
             }
 
             // 3. Install d3d9.dll (DirectX9 to Vulkan/Metal translation)
@@ -373,13 +416,16 @@ class PlatformManager {
 
             if (await fs.pathExists(d3d9Src)) {
                 await fs.copy(d3d9Src, d3d9Dest, { overwrite: true });
-                console.log(`Installed d3d9.dll for graphics optimization`);
+                console.log('Installed d3d9.dll for graphics optimization');
             }
 
             // 4. Patch CrossOver to create wineloader2
             if (wine.type === 'crossover') {
                 const crossoverApp = wine.path.includes('CrossOver.app')
-                    ? wine.path.substring(0, wine.path.indexOf('CrossOver.app') + 'CrossOver.app'.length)
+                    ? wine.path.substring(
+                          0,
+                          wine.path.indexOf('CrossOver.app') + 'CrossOver.app'.length
+                      )
                     : '/Applications/CrossOver.app';
 
                 const wineloaderOrig = path.join(
@@ -393,12 +439,14 @@ class PlatformManager {
 
                 if (await fs.pathExists(wineloaderOrig)) {
                     // Only create wineloader2 if it doesn't exist
-                    if (!await fs.pathExists(wineloader2Path)) {
+                    if (!(await fs.pathExists(wineloader2Path))) {
                         await fs.copy(wineloaderOrig, wineloader2Path, { overwrite: false });
 
                         // Remove code signature (required for Rosetta x87 translation)
                         try {
-                            execSync(`codesign --remove-signature "${wineloader2Path}"`, { stdio: 'pipe' });
+                            execSync(`codesign --remove-signature "${wineloader2Path}"`, {
+                                stdio: 'pipe'
+                            });
                             await fs.chmod(wineloader2Path, 0o755);
                             console.log('Created and unsigned wineloader2');
                         } catch (err) {
@@ -413,7 +461,6 @@ class PlatformManager {
 
             console.log('TurtleSilicon patches installed successfully');
             return result;
-
         } catch (error) {
             result.errors.push(error.message);
             console.error('Failed to install TurtleSilicon patches:', error);
@@ -428,9 +475,10 @@ class PlatformManager {
         // Check which winerosetta method we're using FIRST
         const divxDecoderPath = path.join(installPath, 'DivxDecoder.dll');
         const divxBackupPath = path.join(installPath, 'DivxDecoder.dll.backup');
-        const usingNewMethod = await fs.pathExists(divxDecoderPath) &&
+        const usingNewMethod =
+            (await fs.pathExists(divxDecoderPath)) &&
             (await fs.stat(divxDecoderPath)).size < 100000 && // winerosetta is ~11KB
-            await fs.pathExists(divxBackupPath); // backup exists
+            (await fs.pathExists(divxBackupPath)); // backup exists
 
         // NEW METHOD: Use Wow.exe (DivxDecoder.dll → winerosetta.dll direct import)
         // OLD METHOD: Use Wow_patched.exe (libDllLdr.dll injection)
@@ -439,11 +487,15 @@ class PlatformManager {
 
         // Prefer Wow.exe with NEW method (3x faster), fallback to Wow_patched.exe for OLD method
         let wowExePath;
+        let usingPatched = false;
         if (usingNewMethod) {
             wowExePath = wowOriginalPath; // NEW method: Wow.exe with DivxDecoder.dll
-            console.log('✅ Using NEW method: Wow.exe + DivxDecoder.dll (winerosetta direct import)');
+            console.log(
+                '✅ Using NEW method: Wow.exe + DivxDecoder.dll (winerosetta direct import)'
+            );
         } else if (await fs.pathExists(wowPatchedPath)) {
             wowExePath = wowPatchedPath; // OLD method: Wow_patched.exe with libDllLdr.dll
+            usingPatched = true;
             console.log('⚠️  Using OLD method: Wow_patched.exe + libDllLdr.dll (slower injection)');
         } else {
             wowExePath = wowOriginalPath; // Fallback: original Wow.exe
@@ -453,13 +505,13 @@ class PlatformManager {
         const rosettax87Exe = path.join(installPath, 'rosettax87', 'rosettax87');
 
         // Verify files exist
-        if (!await fs.pathExists(rosettax87Exe)) {
+        if (!(await fs.pathExists(rosettax87Exe))) {
             throw new Error(`rosettax87 not found at: ${rosettax87Exe}`);
         }
-        if (!await fs.pathExists(wineloader2Path)) {
+        if (!(await fs.pathExists(wineloader2Path))) {
             throw new Error(`wineloader2 not found at: ${wineloader2Path}`);
         }
-        if (!await fs.pathExists(wowExePath)) {
+        if (!(await fs.pathExists(wowExePath))) {
             throw new Error(`WoW executable not found at: ${wowExePath}`);
         }
 
@@ -469,14 +521,14 @@ class PlatformManager {
         console.log(`  WoW.exe: ${wowExePath}`);
         console.log(`  Working dir: ${installPath}`);
         if (usingNewMethod) {
-            console.log(`  🚀 Method: DivxDecoder.dll → winerosetta.dll (DIRECT import, 3x faster)`);
+            console.log(
+                '  🚀 Method: DivxDecoder.dll → winerosetta.dll (DIRECT import, 3x faster)'
+            );
         } else {
-            console.log(`  ⚠️  Method: libDllLdr.dll injection (slower)`);
+            console.log('  ⚠️  Method: libDllLdr.dll injection (slower)');
         }
 
         // Set up environment
-        const rosettax87Dir = path.join(installPath, 'rosettax87');
-
         // 🎯 MINIMAL STABLE CONFIGURATION
         // Match TurtleSilicon's exact working environment variables
         // Note: GPU hardware shaders (M2UseShaders/pixelShaders) cause crashes with Wine/d9vk
@@ -484,12 +536,12 @@ class PlatformManager {
         const env = {
             ...process.env,
             // ✅ Minimal TurtleSilicon configuration (verified stable at 22-27 FPS)
-            WINEDLLOVERRIDES: 'd3d9=n,b',                       // Use native d9vk for DirectX9→Vulkan→Metal
-            MTL_HUD_ENABLED: '1',                                // Enable Metal HUD
-            MVK_CONFIG_SYNCHRONOUS_QUEUE_SUBMITS: '1',          // Synchronous queue submits
-            DXVK_ASYNC: '1',                                     // Async shader compilation
-            DXVK_STATE_CACHE_PATH: installPath,                 // Cache compiled shaders
-            WINEDEBUG: '-all',                                   // Disable Wine debug output
+            WINEDLLOVERRIDES: 'd3d9=n,b', // Use native d9vk for DirectX9→Vulkan→Metal
+            MTL_HUD_ENABLED: '1', // Enable Metal HUD
+            MVK_CONFIG_SYNCHRONOUS_QUEUE_SUBMITS: '1', // Synchronous queue submits
+            DXVK_ASYNC: '1', // Async shader compilation
+            DXVK_STATE_CACHE_PATH: installPath, // Cache compiled shaders
+            WINEDEBUG: '-all' // Disable Wine debug output
         };
 
         try {
@@ -500,16 +552,22 @@ class PlatformManager {
 
             const { spawn } = require('child_process');
 
-            console.log(`\n🚀 Launching WoW with ${usingNewMethod ? 'TurtleSilicon v2 (NEW fast method)' : usingPatched ? 'TurtleSilicon optimizations' : 'standard Wine'}...`);
+            console.log(
+                `\n🚀 Launching WoW with ${usingNewMethod ? 'TurtleSilicon v2 (NEW fast method)' : usingPatched ? 'TurtleSilicon optimizations' : 'standard Wine'}...`
+            );
             if (usingNewMethod) {
-                console.log('  ✅ winerosetta.dll: x87 FPU translation (via DivxDecoder.dll DIRECT import)');
+                console.log(
+                    '  ✅ winerosetta.dll: x87 FPU translation (via DivxDecoder.dll DIRECT import)'
+                );
                 console.log('  ⚡ NO DLL injection overhead (~3x faster than old method)');
                 console.log('  🎮 d9vk async: DirectX9 → Vulkan → Metal (GPU-accelerated)');
                 console.log('  🎯 MoltenVK: MTL_HUD_ENABLED=1 + async queues');
                 console.log('  💾 Shader cache: Enabled for faster subsequent launches');
                 console.log('  🚀 Performance: Optimized for Apple Silicon (55-65 FPS expected)');
             } else if (usingPatched) {
-                console.log('  ✅ winerosetta.dll: x87 FPU translation (via libDllLdr.dll injection)');
+                console.log(
+                    '  ✅ winerosetta.dll: x87 FPU translation (via libDllLdr.dll injection)'
+                );
                 console.log('  🎮 d9vk async: DirectX9 → Vulkan → Metal (GPU-accelerated)');
                 console.log('  ⚡ MoltenVK: Async queues + Metal argument buffers');
                 console.log('  💾 Shader cache: Enabled for faster subsequent launches');
@@ -527,18 +585,18 @@ class PlatformManager {
             const wowProcess = spawn(wineloader2Path, [wowExePath], {
                 cwd: installPath,
                 env: env,
-                detached: true,              // 🔑 Run independently from Electron
+                detached: true, // 🔑 Run independently from Electron
                 stdio: ['ignore', 'pipe', 'pipe']
             });
 
             // Log output for debugging (but don't block on it)
-            wowProcess.stdout?.on('data', (data) => {
+            wowProcess.stdout?.on('data', data => {
                 console.log(`WoW stdout: ${data}`);
             });
-            wowProcess.stderr?.on('data', (data) => {
+            wowProcess.stderr?.on('data', data => {
                 console.error(`WoW stderr: ${data}`);
             });
-            wowProcess.on('error', (error) => {
+            wowProcess.on('error', error => {
                 console.error(`WoW process error: ${error.message}`);
             });
             wowProcess.on('exit', (code, signal) => {
@@ -553,7 +611,7 @@ class PlatformManager {
         } catch (error) {
             throw new Error(`Failed to launch WoW: ${error.message}`);
         }
-    }    // Check for platform-specific WoW client compatibility
+    } // Check for platform-specific WoW client compatibility
     async validateWoWInstallation(installPath) {
         const wowExePath = path.join(installPath, 'WoW.exe');
         const dataPath = path.join(installPath, 'Data');
@@ -561,7 +619,9 @@ class PlatformManager {
         const baseCheck = {
             hasExecutable: await fs.pathExists(wowExePath),
             hasData: await fs.pathExists(dataPath),
-            hasRealmlist: await fs.pathExists(path.join(installPath, 'Data', 'enUS', 'realmlist.wtf'))
+            hasRealmlist: await fs.pathExists(
+                path.join(installPath, 'Data', 'enUS', 'realmlist.wtf')
+            )
         };
 
         if (this.isWindows) {
@@ -578,9 +638,10 @@ class PlatformManager {
         const requirements = [];
 
         if (!wine.installed) {
-            requirements.push(this.isMacOS ?
-                'Windows compatibility layer required (Wine/CrossOver)' :
-                'Windows compatibility layer required (Wine)'
+            requirements.push(
+                this.isMacOS
+                    ? 'Windows compatibility layer required (Wine/CrossOver)'
+                    : 'Windows compatibility layer required (Wine)'
             );
         }
 
@@ -604,8 +665,10 @@ class PlatformManager {
             }
         }
 
-        const allRequirementsMet = wine.installed &&
-            (!isAppleSilicon || (turtleSiliconPatches?.rosettax87 && turtleSiliconPatches?.wineloader2));
+        const allRequirementsMet =
+            wine.installed &&
+            (!isAppleSilicon ||
+                (turtleSiliconPatches?.rosettax87 && turtleSiliconPatches?.wineloader2));
 
         return {
             ...baseCheck,
@@ -636,7 +699,10 @@ class PlatformManager {
             } else if (this.isLinux) {
                 result = await this.installWineOnLinux(progressCallback);
             } else {
-                result = { success: false, message: 'Unsupported platform for automatic installation' };
+                result = {
+                    success: false,
+                    message: 'Unsupported platform for automatic installation'
+                };
             }
 
             this._wineInstalling = false;
@@ -658,22 +724,28 @@ class PlatformManager {
             // Check if Homebrew is installed
             if (progressCallback) progressCallback('Checking system requirements...', 10);
 
-            let hasHomebrew = false;
             try {
                 await execAsync('which brew');
-                hasHomebrew = true;
-            } catch (error) {
+            } catch {
                 // Homebrew not found, install it
                 if (progressCallback) progressCallback('Installing package manager...', 20);
 
-                const installHomebrew = spawn('/bin/bash', ['-c',
-                    '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
-                ], { stdio: 'pipe' });
+                const installHomebrew = spawn(
+                    '/bin/bash',
+                    [
+                        '-c',
+                        '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
+                    ],
+                    { stdio: 'pipe' }
+                );
 
                 await new Promise((resolve, reject) => {
-                    installHomebrew.on('close', (code) => {
+                    installHomebrew.on('close', code => {
                         if (code === 0) resolve();
-                        else reject(new Error(`Package manager installation failed with code ${code}`));
+                        else
+                            reject(
+                                new Error(`Package manager installation failed with code ${code}`)
+                            );
                     });
                     installHomebrew.on('error', reject);
                 });
@@ -691,10 +763,10 @@ class PlatformManager {
 
             return {
                 success: true,
-                message: 'Compatibility layer installed successfully. Please restart your Mac for best performance.',
+                message:
+                    'Compatibility layer installed successfully. Please restart your Mac for best performance.',
                 requiresRestart: true
             };
-
         } catch (error) {
             return {
                 success: false,
@@ -709,7 +781,8 @@ class PlatformManager {
         try {
             const packageManager = await this.detectLinuxPackageManager();
 
-            if (progressCallback) progressCallback(`Installing compatibility layer via ${packageManager}...`, 30);
+            if (progressCallback)
+                progressCallback(`Installing compatibility layer via ${packageManager}...`, 30);
 
             let installCommand;
             switch (packageManager) {
@@ -739,7 +812,8 @@ class PlatformManager {
             await execAsync(installCommand);
 
             // Try to install Lutris as well for better gaming support
-            if (progressCallback) progressCallback('Installing Lutris for better gaming support...', 80);
+            if (progressCallback)
+                progressCallback('Installing Lutris for better gaming support...', 80);
             try {
                 await this.installLutrisOnLinux(packageManager);
             } catch (lutrisError) {
@@ -753,7 +827,6 @@ class PlatformManager {
                 message: 'Wine and gaming tools installed successfully!',
                 packageManager: packageManager
             };
-
         } catch (error) {
             return {
                 success: false,
@@ -776,7 +849,7 @@ class PlatformManager {
             try {
                 await execAsync(`which ${manager.command}`);
                 return manager.name;
-            } catch (error) {
+            } catch {
                 continue;
             }
         }
@@ -821,13 +894,18 @@ class PlatformManager {
 
         if (this.isMacOS) {
             return {
-                title: isAppleSilicon ? 'CrossOver Recommended for Apple Silicon' : 'Wine Installation Options for macOS',
+                title: isAppleSilicon
+                    ? 'CrossOver Recommended for Apple Silicon'
+                    : 'Wine Installation Options for macOS',
                 note: isAppleSilicon
                     ? 'CrossOver is highly recommended for Apple Silicon Macs for optimal WoW 3.3.5a performance with native ARM64 support.'
                     : 'Automatic installation is recommended. Use these steps only if automatic installation fails.',
                 methods: [
                     {
-                        name: 'CrossOver (Recommended' + (isAppleSilicon ? ' - Apple Silicon Optimized' : '') + ')',
+                        name:
+                            'CrossOver (Recommended' +
+                            (isAppleSilicon ? ' - Apple Silicon Optimized' : '') +
+                            ')',
                         description: isAppleSilicon
                             ? 'Professional Wine distribution with native Apple Silicon support and libsillicon optimizations'
                             : 'Professional Wine distribution with excellent WoW support',
@@ -835,19 +913,26 @@ class PlatformManager {
                         features: [
                             'One-click bottle creation',
                             'Optimized for gaming',
-                            isAppleSilicon ? 'Native ARM64 with Metal support' : 'Excellent x86_64 compatibility',
+                            isAppleSilicon
+                                ? 'Native ARM64 with Metal support'
+                                : 'Excellent x86_64 compatibility',
                             'Regular updates'
                         ],
                         priority: 'recommended'
                     },
                     {
-                        name: 'Homebrew Wine (Free' + (isAppleSilicon ? ' - Limited Apple Silicon support' : '') + ')',
+                        name:
+                            'Homebrew Wine (Free' +
+                            (isAppleSilicon ? ' - Limited Apple Silicon support' : '') +
+                            ')',
                         description: 'Install via command line',
                         steps: [
                             'Install Homebrew if not present',
                             'Run: brew install --cask xquartz wine-stable'
                         ],
-                        note: isAppleSilicon ? 'May have performance issues on Apple Silicon Macs' : null
+                        note: isAppleSilicon
+                            ? 'May have performance issues on Apple Silicon Macs'
+                            : null
                     }
                 ]
             };
@@ -885,7 +970,7 @@ class PlatformManager {
             }
 
             const wowExePath = path.join(installPath, 'Wow.exe');
-            if (!await fs.pathExists(wowExePath)) {
+            if (!(await fs.pathExists(wowExePath))) {
                 throw new Error('Wow.exe not found at installation path');
             }
 
@@ -925,7 +1010,6 @@ class PlatformManager {
                 patches: patches,
                 message: `Applied ${patches.length} optimization(s)`
             };
-
         } catch (error) {
             return {
                 success: false,
@@ -968,13 +1052,14 @@ class PlatformManager {
                     message: 'CrossOver with libsillicon configured'
                 };
             } else {
-                console.warn('Using Wine on Apple Silicon - CrossOver recommended for better performance');
+                console.warn(
+                    'Using Wine on Apple Silicon - CrossOver recommended for better performance'
+                );
                 return {
                     success: false,
                     error: 'CrossOver recommended for optimal Apple Silicon support'
                 };
             }
-
         } catch (error) {
             return {
                 success: false,

@@ -12,7 +12,7 @@ describe('Integration Tests - Complete Launcher Workflow', () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
-        
+
         mockZip = {
             extract: jest.fn().mockResolvedValue(undefined),
             close: jest.fn().mockResolvedValue(undefined)
@@ -53,7 +53,8 @@ describe('Integration Tests - Complete Launcher Workflow', () => {
         expect(downloadResult.success).toBe(true);
 
         // Step 2: Extract client files
-        fs.readdir = jest.fn()
+        fs.readdir = jest
+            .fn()
             .mockResolvedValueOnce(['ChromieCraft_3.3.5a'])
             .mockResolvedValueOnce(['Data', 'Wow.exe']);
         fs.stat = jest.fn().mockResolvedValue({ isDirectory: () => true });
@@ -63,17 +64,17 @@ describe('Integration Tests - Complete Launcher Workflow', () => {
         const extractClient = async (zipPath, destination) => {
             const tempPath = '/tmp/extract';
             await fs.ensureDir(tempPath);
-            
+
             const zip = await StreamZip.async({ file: zipPath });
             await zip.extract(null, tempPath);
             await zip.close();
 
             const items = await fs.readdir(tempPath);
             const sourcePath = path.join(tempPath, items[0]);
-            
+
             await fs.copy(sourcePath, destination);
             await fs.remove(tempPath);
-            
+
             return { success: true };
         };
 
@@ -82,28 +83,28 @@ describe('Integration Tests - Complete Launcher Workflow', () => {
         expect(mockZip.extract).toHaveBeenCalled();
 
         // Step 3: Install addon from GitHub
-        axios.get = jest.fn()
-            .mockResolvedValueOnce({ data: { default_branch: 'main' } });
-        
+        axios.get = jest.fn().mockResolvedValueOnce({ data: { default_branch: 'main' } });
+
         axios.mockResolvedValueOnce({
             data: mockDownloadStream
         });
 
-        fs.readdir = jest.fn()
+        fs.readdir = jest
+            .fn()
             .mockResolvedValueOnce(['ElvUI-main'])
             .mockResolvedValueOnce(['ElvUI', 'ElvUI_Config'])
             .mockResolvedValueOnce(['ElvUI.toc'])
             .mockResolvedValueOnce(['ElvUI_Config.toc']);
-        
+
         fs.pathExists = jest.fn().mockResolvedValue(false);
         fs.move = jest.fn().mockResolvedValue(undefined);
         fs.writeFile = jest.fn().mockResolvedValue(undefined);
 
         const installAddon = async (owner, repo, installPath) => {
-            const repoInfo = await axios.get(`https://api.github.com/repos/${owner}/${repo}`);
+            await axios.get(`https://api.github.com/repos/${owner}/${repo}`);
             const addonPath = path.join(installPath, 'Interface', 'AddOns');
             await fs.ensureDir(addonPath);
-            
+
             // Mock installation
             const addonFolders = ['ElvUI', 'ElvUI_Config'];
             for (const folder of addonFolders) {
@@ -114,13 +115,9 @@ describe('Integration Tests - Complete Launcher Workflow', () => {
                     `${owner}/${repo}`,
                     'utf8'
                 );
-                await fs.writeFile(
-                    path.join(targetPath, '.github-commit'),
-                    'abc123',
-                    'utf8'
-                );
+                await fs.writeFile(path.join(targetPath, '.github-commit'), 'abc123', 'utf8');
             }
-            
+
             return { success: true, addonsInstalled: addonFolders.length };
         };
 
@@ -129,7 +126,8 @@ describe('Integration Tests - Complete Launcher Workflow', () => {
         expect(installResult.addonsInstalled).toBe(2);
 
         // Step 4: Check for addon updates
-        axios.get = jest.fn()
+        axios.get = jest
+            .fn()
             .mockResolvedValueOnce({ data: { default_branch: 'main' } })
             .mockResolvedValueOnce({
                 data: {
@@ -141,7 +139,7 @@ describe('Integration Tests - Complete Launcher Workflow', () => {
         fs.pathExists = jest.fn().mockResolvedValue(true);
         fs.readFile = jest.fn().mockResolvedValue('abc123'); // Old commit
 
-        const checkUpdates = async (addons) => {
+        const checkUpdates = async addons => {
             const updates = [];
             for (const addon of addons) {
                 const [owner, repo] = addon.githubRepo.split('/');
@@ -149,12 +147,12 @@ describe('Integration Tests - Complete Launcher Workflow', () => {
                 const commits = await axios.get(
                     `https://api.github.com/repos/${owner}/${repo}/commits/${repoInfo.data.default_branch}`
                 );
-                
+
                 const commitFile = path.join(addon.path, '.github-commit');
-                const currentCommit = await fs.pathExists(commitFile)
+                const currentCommit = (await fs.pathExists(commitFile))
                     ? (await fs.readFile(commitFile, 'utf8')).trim()
                     : null;
-                
+
                 updates.push({
                     name: addon.name,
                     hasUpdate: currentCommit !== commits.data.sha
@@ -163,17 +161,20 @@ describe('Integration Tests - Complete Launcher Workflow', () => {
             return { success: true, updates };
         };
 
-        const checkResult = await checkUpdates([{
-            name: 'ElvUI',
-            path: '/wow/Interface/AddOns/ElvUI',
-            githubRepo: 'ElvUI-WotLK/ElvUI'
-        }]);
+        const checkResult = await checkUpdates([
+            {
+                name: 'ElvUI',
+                path: '/wow/Interface/AddOns/ElvUI',
+                githubRepo: 'ElvUI-WotLK/ElvUI'
+            }
+        ]);
 
         expect(checkResult.success).toBe(true);
         expect(checkResult.updates[0].hasUpdate).toBe(true);
 
         // Step 5: Update addon
-        axios.get = jest.fn()
+        axios.get = jest
+            .fn()
             .mockResolvedValueOnce({ data: { default_branch: 'main' } })
             .mockResolvedValueOnce({ data: { sha: 'xyz789' } });
 
@@ -181,33 +182,29 @@ describe('Integration Tests - Complete Launcher Workflow', () => {
             data: mockDownloadStream
         });
 
-        fs.readdir = jest.fn()
+        fs.readdir = jest
+            .fn()
             .mockResolvedValueOnce(['ElvUI-main'])
             .mockResolvedValueOnce(['ElvUI', 'ElvUI_Config'])
             .mockResolvedValueOnce(['ElvUI.toc'])
             .mockResolvedValueOnce(['ElvUI_Config.toc']);
-        
+
         fs.pathExists = jest.fn().mockResolvedValue(true);
         fs.remove = jest.fn().mockResolvedValue(undefined);
         fs.move = jest.fn().mockResolvedValue(undefined);
         fs.writeFile = jest.fn().mockResolvedValue(undefined);
 
-        const updateAddon = async (githubRepo, installPath) => {
-            const [owner, repo] = githubRepo.split('/');
+        const updateAddon = async (_githubRepo, installPath) => {
             const addonPath = path.join(installPath, 'Interface', 'AddOns');
-            
+
             const addonFolders = ['ElvUI', 'ElvUI_Config'];
             for (const folder of addonFolders) {
                 const targetPath = path.join(addonPath, folder);
                 await fs.remove(targetPath);
                 await fs.move(`/tmp/new/${folder}`, targetPath);
-                await fs.writeFile(
-                    path.join(targetPath, '.github-commit'),
-                    'xyz789',
-                    'utf8'
-                );
+                await fs.writeFile(path.join(targetPath, '.github-commit'), 'xyz789', 'utf8');
             }
-            
+
             return { success: true };
         };
 
@@ -225,7 +222,7 @@ describe('Integration Tests - Complete Launcher Workflow', () => {
     test('should handle errors at any step without crashing', async () => {
         // Reset all mocks completely
         jest.resetAllMocks();
-        
+
         // Mock axios to reject
         const mockAxios = require('axios');
         mockAxios.mockRejectedValueOnce(new Error('Network error'));

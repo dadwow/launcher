@@ -2,9 +2,10 @@ name: Run Tests
 
 on:
   push:
-    branches: [ main, develop, feature/** ]
+    branches: [ main, develop, staging, feature/**, fix/** ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, develop, staging ]
+  merge_group:
 
 jobs:
   test:

@@ -2,10 +2,13 @@ name: Build and Release
 
 on:
   push:
-    branches: [ main ]
     tags: [ 'v*' ]
-  pull_request:
-    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 1.0.40)'
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -26,34 +29,28 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
+          cache: 'npm'
       
-      - name: Check if should create release
+      - name: Determine version and validate
         id: check
         run: |
-          if [[ ${{ github.event_name }} == 'push' && ${{ github.ref }} == 'refs/heads/main' ]]; then
+          if [[ ${{ github.event_name }} == 'workflow_dispatch' ]]; then
+            # Manual trigger with version
+            NEW_VERSION="${{ github.event.inputs.version }}"
             echo "should-release=true" >> $GITHUB_OUTPUT
-            
-            # Auto-increment patch version
-            npm version patch --no-git-tag-version
-            NEW_VERSION=$(node -p "require('./package.json').version")
             echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
-            echo "Will create release for version $NEW_VERSION"
+            echo "Manual release triggered for version $NEW_VERSION"
+          elif [[ ${{ github.ref }} == refs/tags/v* ]]; then
+            # Tag-based release
+            TAG_VERSION=${GITHUB_REF#refs/tags/v}
+            echo "should-release=true" >> $GITHUB_OUTPUT
+            echo "version=$TAG_VERSION" >> $GITHUB_OUTPUT
+            echo "Tag-based release for version $TAG_VERSION"
           else
             echo "should-release=false" >> $GITHUB_OUTPUT
             echo "Skipping release creation"
           fi
-      
-      - name: Commit version bump
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          git add package.json
-          git commit -m "Bump version to ${{ steps.check.outputs.version }} [skip ci]"
-          git tag -a "v${{ steps.check.outputs.version }}" -m "Release v${{ steps.check.outputs.version }}"
-          git push
-          git push --tags
 
   # Build job for all platforms
   build:
@@ -66,7 +63,7 @@ jobs:
           - os: macos-latest
             platform: mac
             artifact-name: macos
-          - os: ubuntu-latest  
+          - os: ubuntu-latest
             platform: linux
             artifact-name: linux
           - os: windows-latest
@@ -79,16 +76,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: main
           fetch-depth: 0
-      
-      - name: Pull latest changes (including version bump)
-        run: git pull origin main
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'npm'
 
       - name: Install dependencies
@@ -148,7 +141,7 @@ jobs:
             dist/*.blockmap
           retention-days: 5
 
-  # Release job - only runs on main branch pushes
+  # Release job - only runs on tag pushes
   release:
     needs: [check-release, build]
     runs-on: ubuntu-latest
@@ -159,12 +152,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: main
-      
-      - name: Pull latest changes and fetch tags
-        run: |
-          git pull origin main
-          git fetch --tags --force
 
       - name: Download all build artifacts
         uses: actions/download-artifact@v4
@@ -190,16 +177,23 @@ jobs:
           
           echo "Generating changelog from $PREVIOUS_TAG to HEAD"
           
-          # Generate changelog with better formatting
-          CHANGELOG=$(git log $PREVIOUS_TAG..HEAD --pretty=format:"- %s (%h)" --no-merges | grep -v "\[skip ci\]" | grep -v "Bump version" || echo "- Initial release")
-          
-          # Save to file for multiline output
-          echo "$CHANGELOG" > changelog.txt
-          
-          # Also create a formatted version with categories
-          echo "### 📝 What's Changed" > formatted_changelog.txt
-          echo "" >> formatted_changelog.txt
-          echo "$CHANGELOG" >> formatted_changelog.txt
+          # Generate changelog with categories
+          {
+            echo "### 🚀 Features"
+            git log $PREVIOUS_TAG..HEAD --pretty=format:"- %s (%h)" --no-merges | grep -i "feat:" || echo "- No new features"
+            echo ""
+            echo "### 🐛 Bug Fixes"
+            git log $PREVIOUS_TAG..HEAD --pretty=format:"- %s (%h)" --no-merges | grep -i "fix:" || echo "- No bug fixes"
+            echo ""
+            echo "### 📚 Documentation"
+            git log $PREVIOUS_TAG..HEAD --pretty=format:"- %s (%h)" --no-merges | grep -i "docs:" || echo "- No documentation updates"
+            echo ""
+            echo "### 🔧 Maintenance"
+            git log $PREVIOUS_TAG..HEAD --pretty=format:"- %s (%h)" --no-merges | grep -iE "chore:|refactor:|perf:" || echo "- No maintenance updates"
+            echo ""
+            echo "### 📝 Other Changes"
+            git log $PREVIOUS_TAG..HEAD --pretty=format:"- %s (%h)" --no-merges | grep -viE "feat:|fix:|docs:|chore:|refactor:|perf:|\[skip ci\]|Bump version" || echo "- No other changes"
+          } > formatted_changelog.txt
           
           echo "Changelog generated successfully"
 
