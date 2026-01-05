@@ -1,5 +1,8 @@
 const axios = require('axios');
 
+// Mock axios
+jest.mock('axios');
+
 // Mock implementation of the validate-addon-repo handler
 async function validateAddonRepo(owner, repo) {
     try {
@@ -51,7 +54,7 @@ async function validateAddonRepo(owner, repo) {
                         });
                     }
                 } catch (err) {
-                    console.error(`Error checking directory ${dir.name}:`, err.message);
+                    // Silent error handling during tests
                 }
             }
         }
@@ -76,7 +79,6 @@ async function validateAddonRepo(owner, repo) {
             }
         };
     } catch (error) {
-        console.error('Error validating addon repo:', error.message);
         return {
             valid: false,
             error: error.response?.status === 404 ? 'Repository not found' : error.message
@@ -85,9 +87,33 @@ async function validateAddonRepo(owner, repo) {
 }
 
 describe('Addon Validation', () => {
-    jest.setTimeout(15000); // Increase timeout for API calls
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
 
     test('should validate a valid WoW addon repository with .toc in root (Details)', async () => {
+        // Mock repo response
+        axios.get.mockResolvedValueOnce({
+            data: {
+                name: 'Details-Damage-Meter',
+                full_name: 'Tercioo/Details-Damage-Meter',
+                description: 'Detailed DPS Meter',
+                stargazers_count: 100,
+                language: 'Lua',
+                updated_at: '2026-01-01',
+                default_branch: 'main'
+            }
+        });
+
+        // Mock contents response with .toc file in root
+        axios.get.mockResolvedValueOnce({
+            data: [
+                { name: 'Details.toc', type: 'file' },
+                { name: 'Details.lua', type: 'file' },
+                { name: 'README.md', type: 'file' }
+            ]
+        });
+
         const result = await validateAddonRepo('Tercioo', 'Details-Damage-Meter');
 
         expect(result.valid).toBe(true);
@@ -98,6 +124,51 @@ describe('Addon Validation', () => {
     });
 
     test('should validate a valid WoW addon repository with addon folders (ElvUI)', async () => {
+        // Mock repo response
+        axios.get.mockResolvedValueOnce({
+            data: {
+                name: 'ElvUI',
+                full_name: 'ElvUI-WotLK/ElvUI',
+                description: 'ElvUI for WotLK',
+                stargazers_count: 500,
+                language: 'Lua',
+                updated_at: '2026-01-01',
+                default_branch: 'main'
+            }
+        });
+
+        // Mock contents response with addon folders
+        axios.get.mockResolvedValueOnce({
+            data: [
+                {
+                    name: 'ElvUI',
+                    type: 'dir',
+                    url: 'https://api.github.com/repos/ElvUI-WotLK/ElvUI/contents/ElvUI'
+                },
+                {
+                    name: 'ElvUI_Config',
+                    type: 'dir',
+                    url: 'https://api.github.com/repos/ElvUI-WotLK/ElvUI/contents/ElvUI_Config'
+                }
+            ]
+        });
+
+        // Mock ElvUI folder contents
+        axios.get.mockResolvedValueOnce({
+            data: [
+                { name: 'ElvUI.toc', type: 'file' },
+                { name: 'Core.lua', type: 'file' }
+            ]
+        });
+
+        // Mock ElvUI_Config folder contents
+        axios.get.mockResolvedValueOnce({
+            data: [
+                { name: 'ElvUI_Config.toc', type: 'file' },
+                { name: 'Config.lua', type: 'file' }
+            ]
+        });
+
         const result = await validateAddonRepo('ElvUI-WotLK', 'ElvUI');
 
         expect(result.valid).toBe(true);
@@ -107,6 +178,12 @@ describe('Addon Validation', () => {
     });
 
     test('should reject a non-existent repository', async () => {
+        // Mock 404 error
+        axios.get.mockRejectedValue({
+            response: { status: 404 },
+            message: 'Not Found'
+        });
+
         const result = await validateAddonRepo('nonexistentuser', 'nonexistentrepo');
 
         expect(result.valid).toBe(false);
@@ -114,22 +191,71 @@ describe('Addon Validation', () => {
     });
 
     test('should reject a repository without .toc files', async () => {
-        // Using a well-known non-addon repo
+        // Mock repo response
+        axios.get.mockResolvedValueOnce({
+            data: {
+                name: 'react',
+                full_name: 'facebook/react',
+                description: 'A JavaScript library',
+                stargazers_count: 100000,
+                language: 'JavaScript',
+                updated_at: '2026-01-01',
+                default_branch: 'main'
+            }
+        });
+
+        // Mock contents response without .toc files
+        axios.get.mockResolvedValueOnce({
+            data: [
+                {
+                    name: 'src',
+                    type: 'dir',
+                    url: 'https://api.github.com/repos/facebook/react/contents/src'
+                },
+                { name: 'package.json', type: 'file' },
+                { name: 'README.md', type: 'file' }
+            ]
+        });
+
+        // Mock src folder contents (no .toc files)
+        axios.get.mockResolvedValueOnce({
+            data: [
+                { name: 'index.js', type: 'file' },
+                { name: 'App.js', type: 'file' }
+            ]
+        });
+
         const result = await validateAddonRepo('facebook', 'react');
 
         expect(result.valid).toBe(false);
-        // Should not find any .toc files
-        expect(
-            result.addonInfo?.hasTocInRoot || result.addonInfo?.addonFolders?.length > 0
-        ).toBeFalsy();
+        expect(result.addonInfo.hasTocInRoot).toBe(false);
+        expect(result.addonInfo.addonFolders.length).toBe(0);
     });
 
     test('should include repository metadata', async () => {
+        // Mock repo response
+        axios.get.mockResolvedValueOnce({
+            data: {
+                name: 'Details-Damage-Meter',
+                full_name: 'Tercioo/Details-Damage-Meter',
+                description: 'Detailed DPS Meter',
+                stargazers_count: 150,
+                language: 'Lua',
+                updated_at: '2026-01-01',
+                default_branch: 'main'
+            }
+        });
+
+        // Mock contents response
+        axios.get.mockResolvedValueOnce({
+            data: [{ name: 'Details.toc', type: 'file' }]
+        });
+
         const result = await validateAddonRepo('Tercioo', 'Details-Damage-Meter');
 
         expect(result.repoData).toBeDefined();
         expect(result.repoData.fullName).toBe('Tercioo/Details-Damage-Meter');
-        expect(result.repoData.stars).toBeGreaterThan(0);
-        expect(result.repoData.defaultBranch).toBeDefined();
+        expect(result.repoData.stars).toBe(150);
+        expect(result.repoData.defaultBranch).toBe('main');
     });
 });
