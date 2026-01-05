@@ -36,36 +36,41 @@ We are committed to providing a welcoming and inspiring community for all. Pleas
 ### Setting Up Your Development Environment
 
 1. **Fork the repository**
-   ```bash
-   # Click the 'Fork' button on GitHub
-   ```
+
+    ```bash
+    # Click the 'Fork' button on GitHub
+    ```
 
 2. **Clone your fork**
-   ```bash
-   git clone https://github.com/YOUR_USERNAME/launcher.git
-   cd launcher
-   ```
+
+    ```bash
+    git clone https://github.com/YOUR_USERNAME/launcher.git
+    cd launcher
+    ```
 
 3. **Add upstream remote**
-   ```bash
-   git remote add upstream https://github.com/dadwow/launcher.git
-   ```
+
+    ```bash
+    git remote add upstream https://github.com/dadwow/launcher.git
+    ```
 
 4. **Install dependencies**
-   ```bash
-   npm install
-   ```
+
+    ```bash
+    npm install
+    ```
 
 5. **Set up environment**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your configuration
-   ```
+
+    ```bash
+    cp .env.example .env
+    # Edit .env with your configuration
+    ```
 
 6. **Run the application**
-   ```bash
-   npm start
-   ```
+    ```bash
+    npm start
+    ```
 
 ## 🔄 Development Workflow
 
@@ -93,6 +98,7 @@ We follow the [Conventional Commits](https://www.conventionalcommits.org/) speci
 ```
 
 **Types:**
+
 - `feat`: A new feature
 - `fix`: A bug fix
 - `docs`: Documentation changes
@@ -103,6 +109,7 @@ We follow the [Conventional Commits](https://www.conventionalcommits.org/) speci
 - `chore`: Maintenance tasks
 
 **Examples:**
+
 ```bash
 feat(launcher): add auto-update notification
 fix(download): resolve extraction error on Windows
@@ -126,22 +133,24 @@ git push origin main
 ### JavaScript/Node.js
 
 - **ESLint**: We use ESLint for code linting
-  ```bash
-  npm run lint
-  ```
+
+    ```bash
+    npm run lint
+    ```
 
 - **Prettier**: We use Prettier for code formatting
-  ```bash
-  npm run format
-  ```
+
+    ```bash
+    npm run format
+    ```
 
 - **Code Style**:
-  - Use 4 spaces for indentation
-  - Use single quotes for strings
-  - Add semicolons at the end of statements
-  - Keep lines under 100 characters
-  - Use meaningful variable and function names
-  - Add comments for complex logic
+    - Use 4 spaces for indentation
+    - Use single quotes for strings
+    - Add semicolons at the end of statements
+    - Keep lines under 100 characters
+    - Use meaningful variable and function names
+    - Add comments for complex logic
 
 ### Best Practices
 
@@ -176,6 +185,7 @@ npm run test:coverage
 - Follow the Arrange-Act-Assert pattern
 
 **Example:**
+
 ```javascript
 describe('DownloadManager', () => {
     it('should successfully download a file', async () => {
@@ -198,11 +208,12 @@ describe('DownloadManager', () => {
 ### Before Submitting
 
 1. **Test your changes**
-   ```bash
-   npm test
-   npm run lint
-   npm run format:check
-   ```
+
+    ```bash
+    npm test
+    npm run lint
+    npm run format:check
+    ```
 
 2. **Update documentation** if needed
 
@@ -213,21 +224,22 @@ describe('DownloadManager', () => {
 ### Creating a Pull Request
 
 1. **Push your changes**
-   ```bash
-   git push origin feature/your-feature-name
-   ```
+
+    ```bash
+    git push origin feature/your-feature-name
+    ```
 
 2. **Create a Pull Request** on GitHub
-   - Use a clear, descriptive title
-   - Fill out the PR template completely
-   - Link related issues
-   - Add screenshots for UI changes
-   - Request review from maintainers
+    - Use a clear, descriptive title
+    - Fill out the PR template completely
+    - Link related issues
+    - Add screenshots for UI changes
+    - Request review from maintainers
 
 3. **Respond to feedback**
-   - Address reviewer comments
-   - Push additional commits if needed
-   - Keep the discussion professional
+    - Address reviewer comments
+    - Push additional commits if needed
+    - Keep the discussion professional
 
 ### Pull Request Checklist
 
@@ -247,17 +259,18 @@ Releases are automated through GitHub Actions:
 ### Creating a Release
 
 1. **Manual Release** (Recommended):
-   ```bash
-   # Update version in package.json
-   npm version patch  # or minor, or major
-   
-   # Push the tag
-   git push --tags
-   ```
+
+    ```bash
+    # Update version in package.json
+    npm version patch  # or minor, or major
+
+    # Push the tag
+    git push --tags
+    ```
 
 2. **Automatic Versioning**:
-   - The CI/CD pipeline will automatically build and release when a tag is pushed
-   - Tags should follow semantic versioning: `v1.2.3`
+    - The CI/CD pipeline will automatically build and release when a tag is pushed
+    - Tags should follow semantic versioning: `v1.2.3`
 
 ### Version Numbering
 
@@ -296,6 +309,7 @@ By contributing, you agree that your contributions will be licensed under the sa
 ## 🙏 Recognition
 
 Contributors will be recognized in:
+
 - The project README
 - Release notes
 - GitHub contributors page

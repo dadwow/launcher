@@ -26,7 +26,7 @@ class PEPatcher {
         }
 
         // Get PE header offset (at 0x3C)
-        this.peOffset = this.buffer.readUInt32LE(0x3C);
+        this.peOffset = this.buffer.readUInt32LE(0x3c);
         console.log(`PE offset: 0x${this.peOffset.toString(16)}`);
 
         // Verify PE signature "PE\0\0"
@@ -41,7 +41,9 @@ class PEPatcher {
         const numberOfSections = this.buffer.readUInt16LE(coffHeaderOffset + 2);
         const sizeOfOptionalHeader = this.buffer.readUInt16LE(coffHeaderOffset + 16);
 
-        console.log(`Machine: 0x${machine.toString(16)} (${machine === 0x14C ? 'i386' : 'unknown'})`);
+        console.log(
+            `Machine: 0x${machine.toString(16)} (${machine === 0x14c ? 'i386' : 'unknown'})`
+        );
         console.log(`Sections: ${numberOfSections}`);
         console.log(`Optional header size: ${sizeOfOptionalHeader}`);
 
@@ -72,7 +74,9 @@ class PEPatcher {
         // 5. Adjusting all RVAs and section sizes
 
         // Instead, we'll call an external tool or copy the pre-patched version
-        throw new Error('PE patching not yet implemented - use TurtleSilicon.app to create Wow_patched.exe manually');
+        throw new Error(
+            'PE patching not yet implemented - use TurtleSilicon.app to create Wow_patched.exe manually'
+        );
     }
 
     async save(outputPath) {

@@ -68,8 +68,8 @@ describe('Launcher Self-Update Tests', () => {
             }
         });
 
-        const setupAutoUpdater = (mainWindow) => {
-            autoUpdater.on('update-available', (info) => {
+        const setupAutoUpdater = mainWindow => {
+            autoUpdater.on('update-available', info => {
                 mainWindow.webContents.send('update-available', info);
             });
         };
@@ -81,10 +81,9 @@ describe('Launcher Self-Update Tests', () => {
             updateAvailableCallback({ version: '1.0.2' });
         }
 
-        expect(mockWindow.webContents.send).toHaveBeenCalledWith(
-            'update-available',
-            { version: '1.0.2' }
-        );
+        expect(mockWindow.webContents.send).toHaveBeenCalledWith('update-available', {
+            version: '1.0.2'
+        });
     });
 
     test('should download update when requested', async () => {
@@ -110,8 +109,8 @@ describe('Launcher Self-Update Tests', () => {
             }
         });
 
-        const setupAutoUpdater = (mainWindow) => {
-            autoUpdater.on('download-progress', (progress) => {
+        const setupAutoUpdater = mainWindow => {
+            autoUpdater.on('download-progress', progress => {
                 mainWindow.webContents.send('update-download-progress', progress);
             });
         };
@@ -147,8 +146,8 @@ describe('Launcher Self-Update Tests', () => {
             }
         });
 
-        const setupAutoUpdater = (mainWindow) => {
-            autoUpdater.on('update-downloaded', (info) => {
+        const setupAutoUpdater = mainWindow => {
+            autoUpdater.on('update-downloaded', info => {
                 mainWindow.webContents.send('update-downloaded', info);
             });
         };
@@ -160,10 +159,9 @@ describe('Launcher Self-Update Tests', () => {
             updateDownloadedCallback({ version: '1.0.2' });
         }
 
-        expect(mockWindow.webContents.send).toHaveBeenCalledWith(
-            'update-downloaded',
-            { version: '1.0.2' }
-        );
+        expect(mockWindow.webContents.send).toHaveBeenCalledWith('update-downloaded', {
+            version: '1.0.2'
+        });
     });
 
     test('should quit and install update', async () => {
@@ -189,8 +187,8 @@ describe('Launcher Self-Update Tests', () => {
             }
         });
 
-        const setupAutoUpdater = (mainWindow) => {
-            autoUpdater.on('error', (error) => {
+        const setupAutoUpdater = mainWindow => {
+            autoUpdater.on('error', error => {
                 mainWindow.webContents.send('update-error', error.message);
             });
         };
@@ -245,7 +243,7 @@ describe('Launcher Self-Update Tests', () => {
             }
         });
 
-        const setupAutoUpdater = (mainWindow) => {
+        const setupAutoUpdater = mainWindow => {
             autoUpdater.on('update-not-available', () => {
                 mainWindow.webContents.send('update-not-available');
             });
