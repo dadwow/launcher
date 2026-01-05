@@ -5,5 +5,3 @@ build/
 *.min.js
 *.bundle.js
 package-lock.json
-.github/
-docs/
