@@ -19,7 +19,7 @@ A modern Electron-based launcher for World of Warcraft 3.3.5a clients with cross
 |----------|--------|-------|
 | Windows | ✅ Full Support | Native client runs directly |
 | macOS Intel | ✅ Full Support | Via CrossOver/Wine |
-| macOS Apple Silicon | ⚠️ Partial | Launches but crashes at character select ([details](docs/apple-silicon/README.md)) |
+| macOS Apple Silicon | ✅ Full Support | Via CrossOver/Wine |
 | Linux | ✅ Full Support | Via Wine |
 
 ## Quick Start
