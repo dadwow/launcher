@@ -34,11 +34,9 @@ jobs:
 
       - name: Run npm audit
         run: npm audit --audit-level=high
-        continue-on-error: true
 
       - name: Run npm audit with JSON output
         run: npm audit --json > audit-results.json
-        continue-on-error: true
 
       - name: Upload audit results
         uses: actions/upload-artifact@v4
