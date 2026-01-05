@@ -1,684 +1,775 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Settings</title>
-    <link rel="stylesheet" href="styles.css">
-    <style>
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar {
-            width: 12px;
-            height: 12px;
-        }
-
-        ::-webkit-scrollbar-track {
-            background: rgba(20, 10, 5, 0.6);
-            border-radius: 6px;
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: linear-gradient(180deg, #c85a1f, #f4a540);
-            border-radius: 6px;
-            border: 2px solid rgba(20, 10, 5, 0.6);
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: linear-gradient(180deg, #da913c, #ffb85f);
-        }
-
-        ::-webkit-scrollbar-corner {
-            background: rgba(20, 10, 5, 0.6);
-        }
-
-        .options-container {
-            padding: 20px;
-            max-width: 100%;
-            height: 100vh;
-            overflow-y: auto;
-        }
-
-        .options-header {
-            display: flex;
-            justify-content: between;
-            align-items: center;
-            margin-bottom: 30px;
-            padding-bottom: 15px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .options-tabs {
-            display: flex;
-            margin-bottom: 30px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 8px;
-            padding: 4px;
-        }
-
-        .tab-button {
-            flex: 1;
-            padding: 10px 20px;
-            background: transparent;
-            border: none;
-            color: #aaa;
-            cursor: pointer;
-            border-radius: 6px;
-            transition: all 0.2s ease;
-            font-size: 0.9em;
-        }
-
-        .tab-button.active {
-            background: rgba(244, 165, 64, 0.2);
-            color: #f4a540;
-        }
-
-        .tab-button:hover:not(.active) {
-            background: rgba(255, 255, 255, 0.1);
-            color: #fff;
-        }
-
-        .tab-content {
-            display: none;
-        }
-
-        .tab-content.active {
-            display: block;
-        }
-
-        .options-group {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            padding: 25px;
-            margin-bottom: 20px;
-            backdrop-filter: blur(10px);
-        }
-
-        .options-group h3 {
-            color: #f4a540;
-            margin-bottom: 20px;
-            font-size: 1.2em;
-            font-weight: 500;
-        }
-
-        .option-item {
-            margin-bottom: 20px;
-        }
-
-        .option-item:last-child {
-            margin-bottom: 0;
-        }
-
-        .option-item label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 500;
-            color: #fff;
-        }
-
-        .option-item input,
-        .option-item select {
-            width: 100%;
-            padding: 12px 15px;
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 6px;
-            color: #fff;
-            font-size: 0.9em;
-        }
-
-        .option-item input:focus,
-        .option-item select:focus {
-            outline: none;
-            border-color: #f4a540;
-            box-shadow: 0 0 0 2px rgba(244, 165, 64, 0.2);
-        }
-
-        .input-group {
-            display: flex;
-            gap: 10px;
-        }
-
-        .input-group input {
-            flex: 1;
-        }
-
-        .option-description {
-            font-size: 0.8em;
-            color: #aaa;
-            margin-top: 5px;
-            line-height: 1.4;
-        }
-
-        .addon-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 15px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
-            margin-bottom: 10px;
-        }
-
-        .addon-info {
-            flex: 1;
-        }
-
-        .addon-name {
-            font-weight: 500;
-            color: #fff;
-            margin-bottom: 4px;
-        }
-
-        .addon-description {
-            font-size: 0.8em;
-            color: #aaa;
-        }
-
-        .addon-actions {
-            display: flex;
-            gap: 8px;
-        }
-
-        .addon-status {
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 0.7em;
-            font-weight: 500;
-            text-transform: uppercase;
-        }
-
-        .addon-status.installed {
-            background: rgba(76, 175, 80, 0.2);
-            color: #4caf50;
-        }
-
-        .addon-status.downloading {
-            background: rgba(255, 193, 7, 0.2);
-            color: #ffc107;
-        }
-
-        .addon-status.error {
-            background: rgba(244, 67, 54, 0.2);
-            color: #f44336;
-        }
-
-        .options-buttons {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .test-connection {
-            margin-top: 10px;
-        }
-
-        .connection-status {
-            display: flex;
-            align-items: center;
-            margin-top: 10px;
-            padding: 10px;
-            border-radius: 6px;
-            font-size: 0.9em;
-        }
-
-        .connection-status.success {
-            background: rgba(76, 175, 80, 0.1);
-            border: 1px solid rgba(76, 175, 80, 0.3);
-            color: #4caf50;
-        }
-
-        .connection-status.error {
-            background: rgba(244, 67, 54, 0.1);
-            border: 1px solid rgba(244, 67, 54, 0.3);
-            color: #f44336;
-        }
-
-        .connection-status.testing {
-            background: rgba(255, 193, 7, 0.1);
-            border: 1px solid rgba(255, 193, 7, 0.3);
-            color: #ffc107;
-        }
-
-        /* Repo validation */
-        .repo-validation {
-            margin-top: 10px;
-            padding: 10px 15px;
-            border-radius: 6px;
-            font-size: 0.9em;
-            display: none;
-        }
-
-        .repo-validation.validating {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            background: rgba(255, 193, 7, 0.1);
-            border: 1px solid rgba(255, 193, 7, 0.3);
-            color: #ffc107;
-        }
-
-        .repo-validation.valid {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            background: rgba(76, 175, 80, 0.1);
-            border: 1px solid rgba(76, 175, 80, 0.3);
-            color: #4caf50;
-        }
-
-        .repo-validation.invalid {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            background: rgba(244, 67, 54, 0.1);
-            border: 1px solid rgba(244, 67, 54, 0.3);
-            color: #f44336;
-        }
-
-        .repo-validation .spinner {
-            width: 16px;
-            height: 16px;
-            border: 2px solid currentColor;
-            border-top-color: transparent;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        /* Repo info modal */
-        .modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(4px);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .modal-overlay.active {
-            display: flex;
-        }
-
-        .modal-content {
-            background: rgba(20, 15, 30, 0.98);
-            border: 2px solid rgba(218, 145, 60, 0.4);
-            border-radius: 12px;
-            max-width: 700px;
-            width: 90%;
-            max-height: 80vh;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-        }
-
-        .modal-header {
-            padding: 20px;
-            border-bottom: 1px solid rgba(218, 145, 60, 0.3);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .modal-header h3 {
-            margin: 0;
-            color: #f5e6d3;
-        }
-
-        .modal-close {
-            background: none;
-            border: none;
-            color: #f5e6d3;
-            font-size: 1.5em;
-            cursor: pointer;
-            padding: 0;
-            width: 30px;
-            height: 30px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 4px;
-            transition: background 0.2s;
-        }
-
-        .modal-close:hover {
-            background: rgba(255, 255, 255, 0.1);
-        }
-
-        .modal-body {
-            padding: 20px;
-            overflow-y: auto;
-            flex: 1;
-        }
-
-        .modal-tabs {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            border-bottom: 1px solid rgba(218, 145, 60, 0.2);
-        }
-
-        .modal-tab {
-            padding: 8px 16px;
-            background: none;
-            border: none;
-            border-bottom: 2px solid transparent;
-            color: #aaa;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .modal-tab.active {
-            color: #f4a540;
-            border-bottom-color: #f4a540;
-        }
-
-        .modal-tab-content {
-            display: none;
-        }
-
-        .modal-tab-content.active {
-            display: block;
-        }
-
-        .repo-info {
-            margin-bottom: 15px;
-        }
-
-        .repo-info-item {
-            margin-bottom: 10px;
-            padding: 10px;
-            background: rgba(255, 255, 255, 0.03);
-            border-radius: 4px;
-        }
-
-        .repo-info-label {
-            font-weight: 600;
-            color: #f4a540;
-            margin-right: 8px;
-        }
-
-        .markdown-content {
-            line-height: 1.6;
-            color: #e0d0c0;
-        }
-
-        .markdown-content h1,
-        .markdown-content h2,
-        .markdown-content h3 {
-            color: #f5e6d3;
-            margin-top: 20px;
-            margin-bottom: 10px;
-        }
-
-        .markdown-content code {
-            background: rgba(0, 0, 0, 0.3);
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-family: 'Courier New', monospace;
-        }
-
-        .markdown-content pre {
-            background: rgba(0, 0, 0, 0.3);
-            padding: 12px;
-            border-radius: 6px;
-            overflow-x: auto;
-        }
-
-        .modal-footer {
-            padding: 15px 20px;
-            border-top: 1px solid rgba(218, 145, 60, 0.3);
-            display: flex;
-            justify-content: flex-end;
-            gap: 10px;
-        }
-    </style>
-</head>
-
-<body>
-    <!-- Toast Container -->
-    <div class="toast-container" id="toast-container"></div>
-
-    <!-- Custom Title Bar -->
-    <div class="title-bar">
-        <div class="title-bar-title">Settings</div>
-        <div class="title-bar-drag-region"></div>
-        <div class="title-bar-controls">
-            <button class="title-bar-button close-btn" id="close-btn" title="Close">
-                <svg width="12" height="12" viewBox="0 0 12 12">
-                    <line x1="1" y1="1" x2="11" y2="11" stroke="currentColor" stroke-width="1"/>
-                    <line x1="11" y1="1" x2="1" y2="11" stroke="currentColor" stroke-width="1"/>
-                </svg>
-            </button>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Settings</title>
+        <link rel="stylesheet" href="styles.css" />
+        <style>
+            /* Custom Scrollbar */
+            ::-webkit-scrollbar {
+                width: 12px;
+                height: 12px;
+            }
+
+            ::-webkit-scrollbar-track {
+                background: rgba(20, 10, 5, 0.6);
+                border-radius: 6px;
+            }
+
+            ::-webkit-scrollbar-thumb {
+                background: linear-gradient(180deg, #c85a1f, #f4a540);
+                border-radius: 6px;
+                border: 2px solid rgba(20, 10, 5, 0.6);
+            }
+
+            ::-webkit-scrollbar-thumb:hover {
+                background: linear-gradient(180deg, #da913c, #ffb85f);
+            }
+
+            ::-webkit-scrollbar-corner {
+                background: rgba(20, 10, 5, 0.6);
+            }
+
+            .options-container {
+                padding: 20px;
+                max-width: 100%;
+                height: 100vh;
+                overflow-y: auto;
+            }
+
+            .options-header {
+                display: flex;
+                justify-content: between;
+                align-items: center;
+                margin-bottom: 30px;
+                padding-bottom: 15px;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            }
+
+            .options-tabs {
+                display: flex;
+                margin-bottom: 30px;
+                background: rgba(255, 255, 255, 0.05);
+                border-radius: 8px;
+                padding: 4px;
+            }
+
+            .tab-button {
+                flex: 1;
+                padding: 10px 20px;
+                background: transparent;
+                border: none;
+                color: #aaa;
+                cursor: pointer;
+                border-radius: 6px;
+                transition: all 0.2s ease;
+                font-size: 0.9em;
+            }
+
+            .tab-button.active {
+                background: rgba(244, 165, 64, 0.2);
+                color: #f4a540;
+            }
+
+            .tab-button:hover:not(.active) {
+                background: rgba(255, 255, 255, 0.1);
+                color: #fff;
+            }
+
+            .tab-content {
+                display: none;
+            }
+
+            .tab-content.active {
+                display: block;
+            }
+
+            .options-group {
+                background: rgba(255, 255, 255, 0.05);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 12px;
+                padding: 25px;
+                margin-bottom: 20px;
+                backdrop-filter: blur(10px);
+            }
+
+            .options-group h3 {
+                color: #f4a540;
+                margin-bottom: 20px;
+                font-size: 1.2em;
+                font-weight: 500;
+            }
+
+            .option-item {
+                margin-bottom: 20px;
+            }
+
+            .option-item:last-child {
+                margin-bottom: 0;
+            }
+
+            .option-item label {
+                display: block;
+                margin-bottom: 8px;
+                font-weight: 500;
+                color: #fff;
+            }
+
+            .option-item input,
+            .option-item select {
+                width: 100%;
+                padding: 12px 15px;
+                background: rgba(255, 255, 255, 0.1);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                border-radius: 6px;
+                color: #fff;
+                font-size: 0.9em;
+            }
+
+            .option-item input:focus,
+            .option-item select:focus {
+                outline: none;
+                border-color: #f4a540;
+                box-shadow: 0 0 0 2px rgba(244, 165, 64, 0.2);
+            }
+
+            .input-group {
+                display: flex;
+                gap: 10px;
+            }
+
+            .input-group input {
+                flex: 1;
+            }
+
+            .option-description {
+                font-size: 0.8em;
+                color: #aaa;
+                margin-top: 5px;
+                line-height: 1.4;
+            }
+
+            .addon-item {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 15px;
+                background: rgba(255, 255, 255, 0.05);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 8px;
+                margin-bottom: 10px;
+            }
+
+            .addon-info {
+                flex: 1;
+            }
+
+            .addon-name {
+                font-weight: 500;
+                color: #fff;
+                margin-bottom: 4px;
+            }
+
+            .addon-description {
+                font-size: 0.8em;
+                color: #aaa;
+            }
+
+            .addon-actions {
+                display: flex;
+                gap: 8px;
+            }
+
+            .addon-status {
+                padding: 4px 12px;
+                border-radius: 12px;
+                font-size: 0.7em;
+                font-weight: 500;
+                text-transform: uppercase;
+            }
+
+            .addon-status.installed {
+                background: rgba(76, 175, 80, 0.2);
+                color: #4caf50;
+            }
+
+            .addon-status.downloading {
+                background: rgba(255, 193, 7, 0.2);
+                color: #ffc107;
+            }
+
+            .addon-status.error {
+                background: rgba(244, 67, 54, 0.2);
+                color: #f44336;
+            }
+
+            .options-buttons {
+                display: flex;
+                justify-content: space-between;
+                margin-top: 30px;
+                padding-top: 20px;
+                border-top: 1px solid rgba(255, 255, 255, 0.1);
+            }
+
+            .test-connection {
+                margin-top: 10px;
+            }
+
+            .connection-status {
+                display: flex;
+                align-items: center;
+                margin-top: 10px;
+                padding: 10px;
+                border-radius: 6px;
+                font-size: 0.9em;
+            }
+
+            .connection-status.success {
+                background: rgba(76, 175, 80, 0.1);
+                border: 1px solid rgba(76, 175, 80, 0.3);
+                color: #4caf50;
+            }
+
+            .connection-status.error {
+                background: rgba(244, 67, 54, 0.1);
+                border: 1px solid rgba(244, 67, 54, 0.3);
+                color: #f44336;
+            }
+
+            .connection-status.testing {
+                background: rgba(255, 193, 7, 0.1);
+                border: 1px solid rgba(255, 193, 7, 0.3);
+                color: #ffc107;
+            }
+
+            /* Repo validation */
+            .repo-validation {
+                margin-top: 10px;
+                padding: 10px 15px;
+                border-radius: 6px;
+                font-size: 0.9em;
+                display: none;
+            }
+
+            .repo-validation.validating {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                background: rgba(255, 193, 7, 0.1);
+                border: 1px solid rgba(255, 193, 7, 0.3);
+                color: #ffc107;
+            }
+
+            .repo-validation.valid {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                background: rgba(76, 175, 80, 0.1);
+                border: 1px solid rgba(76, 175, 80, 0.3);
+                color: #4caf50;
+            }
+
+            .repo-validation.invalid {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                background: rgba(244, 67, 54, 0.1);
+                border: 1px solid rgba(244, 67, 54, 0.3);
+                color: #f44336;
+            }
+
+            .repo-validation .spinner {
+                width: 16px;
+                height: 16px;
+                border: 2px solid currentColor;
+                border-top-color: transparent;
+                border-radius: 50%;
+                animation: spin 1s linear infinite;
+            }
+
+            @keyframes spin {
+                to {
+                    transform: rotate(360deg);
+                }
+            }
+
+            /* Repo info modal */
+            .modal-overlay {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.7);
+                backdrop-filter: blur(4px);
+                z-index: 1000;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .modal-overlay.active {
+                display: flex;
+            }
+
+            .modal-content {
+                background: rgba(20, 15, 30, 0.98);
+                border: 2px solid rgba(218, 145, 60, 0.4);
+                border-radius: 12px;
+                max-width: 700px;
+                width: 90%;
+                max-height: 80vh;
+                overflow: hidden;
+                display: flex;
+                flex-direction: column;
+                box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            }
+
+            .modal-header {
+                padding: 20px;
+                border-bottom: 1px solid rgba(218, 145, 60, 0.3);
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+
+            .modal-header h3 {
+                margin: 0;
+                color: #f5e6d3;
+            }
+
+            .modal-close {
+                background: none;
+                border: none;
+                color: #f5e6d3;
+                font-size: 1.5em;
+                cursor: pointer;
+                padding: 0;
+                width: 30px;
+                height: 30px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 4px;
+                transition: background 0.2s;
+            }
+
+            .modal-close:hover {
+                background: rgba(255, 255, 255, 0.1);
+            }
+
+            .modal-body {
+                padding: 20px;
+                overflow-y: auto;
+                flex: 1;
+            }
+
+            .modal-tabs {
+                display: flex;
+                gap: 10px;
+                margin-bottom: 20px;
+                border-bottom: 1px solid rgba(218, 145, 60, 0.2);
+            }
+
+            .modal-tab {
+                padding: 8px 16px;
+                background: none;
+                border: none;
+                border-bottom: 2px solid transparent;
+                color: #aaa;
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+
+            .modal-tab.active {
+                color: #f4a540;
+                border-bottom-color: #f4a540;
+            }
+
+            .modal-tab-content {
+                display: none;
+            }
+
+            .modal-tab-content.active {
+                display: block;
+            }
+
+            .repo-info {
+                margin-bottom: 15px;
+            }
+
+            .repo-info-item {
+                margin-bottom: 10px;
+                padding: 10px;
+                background: rgba(255, 255, 255, 0.03);
+                border-radius: 4px;
+            }
+
+            .repo-info-label {
+                font-weight: 600;
+                color: #f4a540;
+                margin-right: 8px;
+            }
+
+            .markdown-content {
+                line-height: 1.6;
+                color: #e0d0c0;
+            }
+
+            .markdown-content h1,
+            .markdown-content h2,
+            .markdown-content h3 {
+                color: #f5e6d3;
+                margin-top: 20px;
+                margin-bottom: 10px;
+            }
+
+            .markdown-content code {
+                background: rgba(0, 0, 0, 0.3);
+                padding: 2px 6px;
+                border-radius: 3px;
+                font-family: 'Courier New', monospace;
+            }
+
+            .markdown-content pre {
+                background: rgba(0, 0, 0, 0.3);
+                padding: 12px;
+                border-radius: 6px;
+                overflow-x: auto;
+            }
+
+            .modal-footer {
+                padding: 15px 20px;
+                border-top: 1px solid rgba(218, 145, 60, 0.3);
+                display: flex;
+                justify-content: flex-end;
+                gap: 10px;
+            }
+        </style>
+    </head>
+
+    <body>
+        <!-- Toast Container -->
+        <div class="toast-container" id="toast-container"></div>
+
+        <!-- Custom Title Bar -->
+        <div class="title-bar">
+            <div class="title-bar-title">Settings</div>
+            <div class="title-bar-drag-region"></div>
+            <div class="title-bar-controls">
+                <button class="title-bar-button close-btn" id="close-btn" title="Close">
+                    <svg width="12" height="12" viewBox="0 0 12 12">
+                        <line
+                            x1="1"
+                            y1="1"
+                            x2="11"
+                            y2="11"
+                            stroke="currentColor"
+                            stroke-width="1"
+                        />
+                        <line
+                            x1="11"
+                            y1="1"
+                            x2="1"
+                            y2="11"
+                            stroke="currentColor"
+                            stroke-width="1"
+                        />
+                    </svg>
+                </button>
+            </div>
         </div>
-    </div>
 
-    <div class="options-container">
-        <div class="options-header">
-            <h2>Settings</h2>
-        </div>
-
-        <div class="options-tabs">
-            <button class="tab-button active" data-tab="addons">Addons</button>
-            <button class="tab-button" data-tab="advanced">Advanced</button>
-        </div>
-
-        <!-- Addons Tab -->
-        <div id="addons-tab" class="tab-content active">
-            <div class="options-group">
-                <h3>Install Addon from GitHub</h3>
-                <div class="option-item">
-                    <label for="github-repo-url">GitHub Repository URL:</label>
-                    <div class="input-group">
-                        <input type="text" id="github-repo-url" placeholder="https://github.com/user/addon-name">
-                        <button id="install-addon-btn" class="btn btn-primary"><span class="btn-text">Install</span></button>
-                    </div>
-                    <div class="option-description">
-                        Enter a GitHub repository URL to download and install the addon.<br>
-                        Examples: https://github.com/ElvUI-WotLK/ElvUI or just "ElvUI-WotLK/ElvUI"
-                    </div>
-                    <div id="repo-validation" class="repo-validation">
-                        <div class="spinner"></div>
-                        <span id="repo-validation-text">Validating repository...</span>
-                    </div>
-                </div>
+        <div class="options-container">
+            <div class="options-header">
+                <h2>Settings</h2>
             </div>
 
-            <div class="options-group">
-                <h3>
-                    Installed Addons
-                    <button class="btn btn-primary" onclick="checkForUpdates()" style="margin-left: 10px; font-size: 0.9em;"><span class="btn-text">Check for Updates</span></button>
-                </h3>
-                <div id="addon-list">
-                    <div class="addon-item">
-                        <div class="addon-info">
-                            <div class="addon-name">No addons installed</div>
-                            <div class="addon-description">Install addons from GitHub repositories above</div>
+            <div class="options-tabs">
+                <button class="tab-button active" data-tab="addons">Addons</button>
+                <button class="tab-button" data-tab="advanced">Advanced</button>
+            </div>
+
+            <!-- Addons Tab -->
+            <div id="addons-tab" class="tab-content active">
+                <div class="options-group">
+                    <h3>Install Addon from GitHub</h3>
+                    <div class="option-item">
+                        <label for="github-repo-url">GitHub Repository URL:</label>
+                        <div class="input-group">
+                            <input
+                                type="text"
+                                id="github-repo-url"
+                                placeholder="https://github.com/user/addon-name"
+                            />
+                            <button id="install-addon-btn" class="btn btn-primary">
+                                <span class="btn-text">Install</span>
+                            </button>
+                        </div>
+                        <div class="option-description">
+                            Enter a GitHub repository URL to download and install the addon.<br />
+                            Examples: https://github.com/ElvUI-WotLK/ElvUI or just
+                            "ElvUI-WotLK/ElvUI"
+                        </div>
+                        <div id="repo-validation" class="repo-validation">
+                            <div class="spinner"></div>
+                            <span id="repo-validation-text">Validating repository...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="options-group">
+                    <h3>
+                        Installed Addons
+                        <button
+                            class="btn btn-primary"
+                            onclick="checkForUpdates()"
+                            style="margin-left: 10px; font-size: 0.9em"
+                        >
+                            <span class="btn-text">Check for Updates</span>
+                        </button>
+                    </h3>
+                    <div id="addon-list">
+                        <div class="addon-item">
+                            <div class="addon-info">
+                                <div class="addon-name">No addons installed</div>
+                                <div class="addon-description">
+                                    Install addons from GitHub repositories above
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="options-group">
+                    <h3>Addon Settings</h3>
+                    <div class="option-item">
+                        <label for="auto-update-addons">Auto-update addons on launch:</label>
+                        <select id="auto-update-addons">
+                            <option value="false">No</option>
+                            <option value="true">Yes</option>
+                        </select>
+                        <div class="option-description">
+                            Automatically check for addon updates when launching the game
+                        </div>
+                    </div>
+
+                    <div class="option-item">
+                        <label for="addon-backup">Backup existing addons before update:</label>
+                        <select id="addon-backup">
+                            <option value="true">Yes</option>
+                            <option value="false">No</option>
+                        </select>
+                        <div class="option-description">
+                            Create backups of existing addons before installing updates
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="options-group">
-                <h3>Addon Settings</h3>
-                <div class="option-item">
-                    <label for="auto-update-addons">Auto-update addons on launch:</label>
-                    <select id="auto-update-addons">
-                        <option value="false">No</option>
-                        <option value="true">Yes</option>
-                    </select>
-                    <div class="option-description">Automatically check for addon updates when launching the game</div>
-                </div>
-
-                <div class="option-item">
-                    <label for="addon-backup">Backup existing addons before update:</label>
-                    <select id="addon-backup">
-                        <option value="true">Yes</option>
-                        <option value="false">No</option>
-                    </select>
-                    <div class="option-description">Create backups of existing addons before installing updates</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Advanced Tab -->
-        <div id="advanced-tab" class="tab-content">
-            <div class="options-group">
-                <h3>Installation Settings</h3>
-                <div class="option-item">
-                    <label for="install-path-options">WoW Installation Path:</label>
-                    <div class="input-group">
-                        <input type="text" id="install-path-options" readonly
-                            placeholder="Select installation directory">
-                        <button id="browse-install-path" class="btn btn-secondary"><span class="btn-text">Browse</span></button>
-                        <button id="suggest-paths" class="btn btn-secondary"><span class="btn-text">Suggest</span></button>
-                    </div>
-                    <div class="option-description">Directory where World of Warcraft is or will be installed</div>
-                </div>
-
-                <div class="option-item">
-                    <div id="installation-status-options" class="installation-status">
-                        <span class="status-icon">ℹ️</span>
-                        <span>Select an installation path to check WoW client status</span>
-                    </div>
-                </div>
-
-                <div id="platform-info" class="option-item" style="display: none;">
-                    <label>Platform:</label>
-                    <div id="platform-status" class="status-display">
-                        <span class="status-icon">ℹ️</span>
-                        <span id="platform-text">Loading platform information...</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Wine Configuration (Non-Windows only) -->
-            <div id="wine-config-group" class="options-group" style="display: none;">
-                <h3>Wine Configuration</h3>
-                <div class="option-item">
-                    <div id="wine-status" class="status-display">
-                        <span class="status-icon">⚠️</span>
-                        <span>Checking Wine installation...</span>
-                    </div>
-                </div>
-
-                <div class="option-item" id="wine-install-instructions" style="display: none;">
-                    <label>Wine Not Found:</label>
-                    <div class="option-description" id="wine-instructions-text">
-                        Wine is required to run WoW on this platform. Please install Wine or CrossOver.
-                    </div>
-                    <button id="show-wine-instructions" class="btn btn-secondary">Installation Instructions</button>
-                </div>
-
-                <div class="option-item" id="wine-prefix-config" style="display: none;">
-                    <label for="wine-prefix-path">Wine Prefix Path:</label>
-                    <div class="input-group">
-                        <input type="text" id="wine-prefix-path" readonly>
-                        <button id="create-wine-prefix" class="btn btn-secondary">Create/Reset Prefix</button>
-                    </div>
-                    <div class="option-description">Wine prefix directory for WoW installation</div>
-                </div>
-            </div>
-
-            <div class="options-group">
-                <h3>Launcher Settings</h3>
-                <div class="option-item">
-                    <label for="auto-update-realmlist">Auto-update realmlist on launch:</label>
-                    <select id="auto-update-realmlist">
-                        <option value="true">Yes</option>
-                        <option value="false">No</option>
-                    </select>
-                    <div class="option-description">Automatically update realmlist.wtf before launching the game</div>
-                </div>
-
-                <div class="option-item">
-                    <label for="close-on-launch">Close launcher when game starts:</label>
-                    <select id="close-on-launch">
-                        <option value="false">No</option>
-                        <option value="true">Yes</option>
-                    </select>
-                    <div class="option-description">Whether to close the launcher when WoW starts</div>
-                </div>
-
-                <div class="option-item">
-                    <label for="download-url-options">Client Download URL:</label>
-                    <input type="url" id="download-url-options" placeholder="https://example.com/wow-client.zip">
-                    <div class="option-description">URL to download the complete WoW client (ZIP format)</div>
-                </div>
-            </div>
-
-            <div class="options-group">
-                <details>
-                    <summary style="cursor: pointer; font-weight: 600; padding: 10px; background: rgba(255, 255, 255, 0.05); border-radius: 6px; margin-bottom: 15px;">
-                        Server Configuration
-                    </summary>
+            <!-- Advanced Tab -->
+            <div id="advanced-tab" class="tab-content">
+                <div class="options-group">
+                    <h3>Installation Settings</h3>
                     <div class="option-item">
-                        <label for="realm-address">Realm Address:</label>
-                        <input type="text" id="realm-address" placeholder="logon.server.com">
-                        <div class="option-description">Server address that will be written to realmlist.wtf</div>
+                        <label for="install-path-options">WoW Installation Path:</label>
+                        <div class="input-group">
+                            <input
+                                type="text"
+                                id="install-path-options"
+                                readonly
+                                placeholder="Select installation directory"
+                            />
+                            <button id="browse-install-path" class="btn btn-secondary">
+                                <span class="btn-text">Browse</span>
+                            </button>
+                            <button id="suggest-paths" class="btn btn-secondary">
+                                <span class="btn-text">Suggest</span>
+                            </button>
+                        </div>
+                        <div class="option-description">
+                            Directory where World of Warcraft is or will be installed
+                        </div>
                     </div>
 
                     <div class="option-item">
-                        <button id="test-connection" class="btn btn-secondary">Test Connection</button>
-                        <div id="realm-connection-status" class="connection-status" style="display: none;">
+                        <div id="installation-status-options" class="installation-status">
                             <span class="status-icon">ℹ️</span>
-                            <span class="status-text">Testing connection...</span>
+                            <span>Select an installation path to check WoW client status</span>
                         </div>
                     </div>
-                </details>
+
+                    <div id="platform-info" class="option-item" style="display: none">
+                        <label>Platform:</label>
+                        <div id="platform-status" class="status-display">
+                            <span class="status-icon">ℹ️</span>
+                            <span id="platform-text">Loading platform information...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Wine Configuration (Non-Windows only) -->
+                <div id="wine-config-group" class="options-group" style="display: none">
+                    <h3>Wine Configuration</h3>
+                    <div class="option-item">
+                        <div id="wine-status" class="status-display">
+                            <span class="status-icon">⚠️</span>
+                            <span>Checking Wine installation...</span>
+                        </div>
+                    </div>
+
+                    <div class="option-item" id="wine-install-instructions" style="display: none">
+                        <label>Wine Not Found:</label>
+                        <div class="option-description" id="wine-instructions-text">
+                            Wine is required to run WoW on this platform. Please install Wine or
+                            CrossOver.
+                        </div>
+                        <button id="show-wine-instructions" class="btn btn-secondary">
+                            Installation Instructions
+                        </button>
+                    </div>
+
+                    <div class="option-item" id="wine-prefix-config" style="display: none">
+                        <label for="wine-prefix-path">Wine Prefix Path:</label>
+                        <div class="input-group">
+                            <input type="text" id="wine-prefix-path" readonly />
+                            <button id="create-wine-prefix" class="btn btn-secondary">
+                                Create/Reset Prefix
+                            </button>
+                        </div>
+                        <div class="option-description">
+                            Wine prefix directory for WoW installation
+                        </div>
+                    </div>
+                </div>
+
+                <div class="options-group">
+                    <h3>Launcher Settings</h3>
+                    <div class="option-item">
+                        <label for="auto-update-realmlist">Auto-update realmlist on launch:</label>
+                        <select id="auto-update-realmlist">
+                            <option value="true">Yes</option>
+                            <option value="false">No</option>
+                        </select>
+                        <div class="option-description">
+                            Automatically update realmlist.wtf before launching the game
+                        </div>
+                    </div>
+
+                    <div class="option-item">
+                        <label for="close-on-launch">Close launcher when game starts:</label>
+                        <select id="close-on-launch">
+                            <option value="false">No</option>
+                            <option value="true">Yes</option>
+                        </select>
+                        <div class="option-description">
+                            Whether to close the launcher when WoW starts
+                        </div>
+                    </div>
+
+                    <div class="option-item">
+                        <label for="download-url-options">Client Download URL:</label>
+                        <input
+                            type="url"
+                            id="download-url-options"
+                            placeholder="https://example.com/wow-client.zip"
+                        />
+                        <div class="option-description">
+                            URL to download the complete WoW client (ZIP format)
+                        </div>
+                    </div>
+                </div>
+
+                <div class="options-group">
+                    <details>
+                        <summary
+                            style="
+                                cursor: pointer;
+                                font-weight: 600;
+                                padding: 10px;
+                                background: rgba(255, 255, 255, 0.05);
+                                border-radius: 6px;
+                                margin-bottom: 15px;
+                            "
+                        >
+                            Server Configuration
+                        </summary>
+                        <div class="option-item">
+                            <label for="realm-address-options">Realm Address:</label>
+                            <input
+                                type="text"
+                                id="realm-address-options"
+                                placeholder="logon.server.com"
+                            />
+                            <div class="option-description">
+                                Server address that will be written to realmlist.wtf
+                            </div>
+                        </div>
+
+                        <div class="option-item">
+                            <button id="test-realm-connection" class="btn btn-secondary">
+                                Test Connection
+                            </button>
+                            <div
+                                id="realm-connection-status"
+                                class="connection-status"
+                                style="display: none"
+                            >
+                                <span class="status-icon">ℹ️</span>
+                                <span class="status-text">Testing connection...</span>
+                            </div>
+                        </div>
+                    </details>
+                </div>
+            </div>
+
+            <div class="options-buttons">
+                <button id="cancel-options" class="btn btn-secondary">
+                    <span class="btn-text">Cancel</span>
+                </button>
+                <div>
+                    <button id="reset-options" class="btn btn-danger">
+                        <span class="btn-text">Reset to Defaults</span>
+                    </button>
+                    <button id="save-options" class="btn btn-primary">
+                        <span class="btn-text">Save Changes</span>
+                    </button>
+                </div>
             </div>
         </div>
 
-        <div class="options-buttons">
-                <button id="cancel-options" class="btn btn-secondary"><span class="btn-text">Cancel</span></button>
-            <div>
-                <button id="reset-options" class="btn btn-danger"><span class="btn-text">Reset to Defaults</span></button>
-                <button id="save-options" class="btn btn-primary"><span class="btn-text">Save Changes</span></button>
+        <!-- Repo Info Modal -->
+        <div id="repo-info-modal" class="modal-overlay">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="modal-repo-title">Repository Information</h3>
+                    <button class="modal-close" onclick="closeRepoModal()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="repo-info" id="modal-repo-info"></div>
+                    <div class="modal-tabs">
+                        <button class="modal-tab active" onclick="switchModalTab('readme')">
+                            README
+                        </button>
+                        <button class="modal-tab" onclick="switchModalTab('releases')">
+                            Releases
+                        </button>
+                    </div>
+                    <div id="modal-tab-readme" class="modal-tab-content active">
+                        <div class="markdown-content" id="modal-readme-content">Loading...</div>
+                    </div>
+                    <div id="modal-tab-releases" class="modal-tab-content">
+                        <div class="markdown-content" id="modal-releases-content">Loading...</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="closeRepoModal()">Close</button>
+                    <button class="btn btn-primary" id="modal-install-btn">Install Addon</button>
+                </div>
             </div>
         </div>
-    </div>
 
-    <!-- Repo Info Modal -->
-    <div id="repo-info-modal" class="modal-overlay">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 id="modal-repo-title">Repository Information</h3>
-                <button class="modal-close" onclick="closeRepoModal()">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="repo-info" id="modal-repo-info"></div>
-                <div class="modal-tabs">
-                    <button class="modal-tab active" onclick="switchModalTab('readme')">README</button>
-                    <button class="modal-tab" onclick="switchModalTab('releases')">Releases</button>
-                </div>
-                <div id="modal-tab-readme" class="modal-tab-content active">
-                    <div class="markdown-content" id="modal-readme-content">Loading...</div>
-                </div>
-                <div id="modal-tab-releases" class="modal-tab-content">
-                    <div class="markdown-content" id="modal-releases-content">Loading...</div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeRepoModal()">Close</button>
-                <button class="btn btn-primary" id="modal-install-btn">Install Addon</button>
-            </div>
-        </div>
-    </div>
-
-    <script src="options.js"></script>
-</body>
-
+        <script src="options.js"></script>
+    </body>
 </html>
