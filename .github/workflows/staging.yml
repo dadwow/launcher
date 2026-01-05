@@ -171,7 +171,7 @@ jobs:
             staging-artifacts/staging-Linux-*/*.AppImage
             staging-artifacts/staging-Linux-*/*.deb
             staging-artifacts/staging-Linux-*/*.tar.gz
-          fail_on_unmatched_files: false
+          fail_on_unmatched_files: true
 
   staging-summary:
     name: Staging Build Summary
