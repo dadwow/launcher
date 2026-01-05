@@ -5,13 +5,9 @@
 
 const fs = require('fs-extra');
 const path = require('path');
-const { promisify } = require('util');
-const { exec } = require('child_process');
 
 jest.mock('fs-extra');
 jest.mock('child_process');
-
-const execAsync = promisify(exec);
 
 describe('macOS Patches Tests', () => {
     let platformManager;
@@ -25,7 +21,7 @@ describe('macOS Patches Tests', () => {
             arch: 'arm64',
             isMacOS: true,
             isAppleSilicon: true,
-            
+
             checkWineInstallation: jest.fn(),
             applyLibSiliconPatch: jest.fn(),
             applyMacOSPatches: jest.fn()
@@ -40,10 +36,10 @@ describe('macOS Patches Tests', () => {
 
     test('should apply macOS patches on Apple Silicon', async () => {
         const installPath = '/Applications/World of Warcraft';
-        
+
         // Mock WoW executable exists
         fs.pathExists.mockResolvedValue(true);
-        
+
         // Mock CrossOver detected
         platformManager.checkWineInstallation.mockResolvedValue({
             installed: true,
@@ -58,7 +54,7 @@ describe('macOS Patches Tests', () => {
                 callback('Setting file permissions...', 80);
                 callback('macOS patches applied successfully!', 100);
             }
-            
+
             return {
                 success: true,
                 patches: ['libsillicon (Apple Silicon optimization)', 'file permissions'],
@@ -91,7 +87,7 @@ describe('macOS Patches Tests', () => {
 
         platformManager.applyLibSiliconPatch.mockImplementation(async () => {
             await fs.ensureDir(path.dirname(configPath));
-            
+
             const recommendedSettings = [
                 'SET gxApi "OpenGL"',
                 'SET M2Faster "3"',
@@ -143,19 +139,19 @@ describe('macOS Patches Tests', () => {
 
     test('should handle missing WoW executable', async () => {
         const installPath = '/Applications/World of Warcraft';
-        
+
         fs.pathExists.mockResolvedValue(false); // Wow.exe doesn't exist
 
-        platformManager.applyMacOSPatches.mockImplementation(async (path) => {
+        platformManager.applyMacOSPatches.mockImplementation(async path => {
             const wowExePath = path + '/Wow.exe';
-            if (!await fs.pathExists(wowExePath)) {
+            if (!(await fs.pathExists(wowExePath))) {
                 throw new Error('Wow.exe not found at installation path');
             }
         });
 
-        await expect(
-            platformManager.applyMacOSPatches(installPath)
-        ).rejects.toThrow('Wow.exe not found at installation path');
+        await expect(platformManager.applyMacOSPatches(installPath)).rejects.toThrow(
+            'Wow.exe not found at installation path'
+        );
     });
 
     test('should warn when Wine is used instead of CrossOver on Apple Silicon', async () => {
@@ -167,9 +163,11 @@ describe('macOS Patches Tests', () => {
 
         platformManager.applyLibSiliconPatch.mockImplementation(async () => {
             const wineInfo = await platformManager.checkWineInstallation();
-            
+
             if (wineInfo.type !== 'crossover') {
-                console.warn('Using Wine on Apple Silicon - CrossOver recommended for better performance');
+                console.warn(
+                    'Using Wine on Apple Silicon - CrossOver recommended for better performance'
+                );
                 return {
                     success: false,
                     error: 'CrossOver recommended for optimal Apple Silicon support'
@@ -190,11 +188,11 @@ describe('macOS Patches Tests', () => {
         fs.pathExists.mockResolvedValue(true);
 
         const mockExecAsync = jest.fn().mockResolvedValue({ stdout: '', stderr: '' });
-        
-        platformManager.applyMacOSPatches.mockImplementation(async (path) => {
+
+        platformManager.applyMacOSPatches.mockImplementation(async path => {
             await mockExecAsync(`chmod -R u+rwX "${path}"`);
             await mockExecAsync(`chmod +x "${wowExePath}"`);
-            
+
             return {
                 success: true,
                 patches: ['file permissions']
@@ -222,7 +220,7 @@ describe('Automatic Wine/CrossOver Installation Tests', () => {
     });
 
     test('should automatically install Wine after client download', async () => {
-        platformManager.installWineAutomatically.mockImplementation(async (callback) => {
+        platformManager.installWineAutomatically.mockImplementation(async callback => {
             if (callback) {
                 callback('Installing compatibility layer...', 0);
                 callback('Downloading Wine...', 30);
@@ -251,8 +249,8 @@ describe('Automatic Wine/CrossOver Installation Tests', () => {
             new Error('Failed to install Wine: Permission denied')
         );
 
-        await expect(
-            platformManager.installWineAutomatically()
-        ).rejects.toThrow('Failed to install Wine');
+        await expect(platformManager.installWineAutomatically()).rejects.toThrow(
+            'Failed to install Wine'
+        );
     });
 });
