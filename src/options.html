@@ -290,7 +290,9 @@
         }
 
         @keyframes spin {
-            to { transform: rotate(360deg); }
+            to {
+                transform: rotate(360deg);
+            }
         }
 
         /* Repo info modal */
@@ -459,8 +461,8 @@
         <div class="title-bar-controls">
             <button class="title-bar-button close-btn" id="close-btn" title="Close">
                 <svg width="12" height="12" viewBox="0 0 12 12">
-                    <line x1="1" y1="1" x2="11" y2="11" stroke="currentColor" stroke-width="1"/>
-                    <line x1="11" y1="1" x2="1" y2="11" stroke="currentColor" stroke-width="1"/>
+                    <line x1="1" y1="1" x2="11" y2="11" stroke="currentColor" stroke-width="1" />
+                    <line x1="11" y1="1" x2="1" y2="11" stroke="currentColor" stroke-width="1" />
                 </svg>
             </button>
         </div>
@@ -484,7 +486,8 @@
                     <label for="github-repo-url">GitHub Repository URL:</label>
                     <div class="input-group">
                         <input type="text" id="github-repo-url" placeholder="https://github.com/user/addon-name">
-                        <button id="install-addon-btn" class="btn btn-primary"><span class="btn-text">Install</span></button>
+                        <button id="install-addon-btn" class="btn btn-primary"><span
+                                class="btn-text">Install</span></button>
                     </div>
                     <div class="option-description">
                         Enter a GitHub repository URL to download and install the addon.<br>
@@ -500,7 +503,9 @@
             <div class="options-group">
                 <h3>
                     Installed Addons
-                    <button class="btn btn-primary" onclick="checkForUpdates()" style="margin-left: 10px; font-size: 0.9em;"><span class="btn-text">Check for Updates</span></button>
+                    <button class="btn btn-primary" onclick="checkForUpdates()"
+                        style="margin-left: 10px; font-size: 0.9em;"><span class="btn-text">Check for
+                            Updates</span></button>
                 </h3>
                 <div id="addon-list">
                     <div class="addon-item">
@@ -543,8 +548,10 @@
                     <div class="input-group">
                         <input type="text" id="install-path-options" readonly
                             placeholder="Select installation directory">
-                        <button id="browse-install-path" class="btn btn-secondary"><span class="btn-text">Browse</span></button>
-                        <button id="suggest-paths" class="btn btn-secondary"><span class="btn-text">Suggest</span></button>
+                        <button id="browse-install-path" class="btn btn-secondary"><span
+                                class="btn-text">Browse</span></button>
+                        <button id="suggest-paths" class="btn btn-secondary"><span
+                                class="btn-text">Suggest</span></button>
                     </div>
                     <div class="option-description">Directory where World of Warcraft is or will be installed</div>
                 </div>
@@ -622,7 +629,8 @@
 
             <div class="options-group">
                 <details>
-                    <summary style="cursor: pointer; font-weight: 600; padding: 10px; background: rgba(255, 255, 255, 0.05); border-radius: 6px; margin-bottom: 15px;">
+                    <summary
+                        style="cursor: pointer; font-weight: 600; padding: 10px; background: rgba(255, 255, 255, 0.05); border-radius: 6px; margin-bottom: 15px;">
                         Server Configuration
                     </summary>
                     <div class="option-item">
@@ -643,9 +651,10 @@
         </div>
 
         <div class="options-buttons">
-                <button id="cancel-options" class="btn btn-secondary"><span class="btn-text">Cancel</span></button>
+            <button id="cancel-options" class="btn btn-secondary"><span class="btn-text">Cancel</span></button>
             <div>
-                <button id="reset-options" class="btn btn-danger"><span class="btn-text">Reset to Defaults</span></button>
+                <button id="reset-options" class="btn btn-danger"><span class="btn-text">Reset to
+                        Defaults</span></button>
                 <button id="save-options" class="btn btn-primary"><span class="btn-text">Save Changes</span></button>
             </div>
         </div>
