@@ -208,7 +208,8 @@ const appState = {
     realmAddress: '',
     wineInfo: null,
     updateAvailable: false,
-    updateVersion: null
+    updateVersion: null,
+    updateDownloaded: false
 };
 
 console.log('App state initialized');
@@ -630,22 +631,34 @@ async function handleMainAction() {
             await launchWow();
             break;
         case 'update':
-            // If update is ready, install it; otherwise download it first
-            if (elements.mainActionButton.textContent.includes('Restart')) {
-                // Update is downloaded, install and restart
-                await window.electronAPI.installUpdate();
-            } else {
-                // Download the update first
-                try {
-                    updateMainActionButton('update', '⏳ Downloading...', false);
-                    await window.electronAPI.downloadUpdate();
-                    // The 'update-status' listener will handle UI updates when download completes
-                } catch (error) {
-                    console.error('Failed to download update:', error);
-                    showError('Failed to download update: ' + error.message);
-                    // Restore button
-                    if (appState.updateVersion) {
-                        showUpdateNotification(appState.updateVersion);
+            // Check if update is already downloaded
+            {
+                const updateDownloaded = Boolean(appState && appState.updateDownloaded);
+                if (updateDownloaded) {
+                    // Update is downloaded, install and restart
+                    await window.electronAPI.installUpdate();
+                } else {
+                    // Download the update first
+                    try {
+                        // Explicitly mark update as not yet downloaded while we (re)start download
+                        if (appState) {
+                            appState.updateDownloaded = false;
+                        }
+                        updateMainActionButton('update', '⏳ Downloading...', false);
+                        await window.electronAPI.downloadUpdate();
+                        // The 'update-status' listener will handle UI updates
+                        // when download completes
+                    } catch (error) {
+                        console.error('Failed to download update:', error);
+                        showError('Failed to download update: ' + error.message);
+                        // Reset update flags on error
+                        if (appState) {
+                            appState.updateAvailable = false;
+                            appState.updateVersion = null;
+                            appState.updateDownloaded = false;
+                        }
+                        // Restore normal button state
+                        checkGameStatus();
                     }
                 }
             }
@@ -1072,10 +1085,14 @@ function showUpdateChecking() {
 function hideUpdateNotification() {
     // Don't show notification modal - updates handled through main UI
     console.log('Update notification hidden');
-    // Only restore normal button state if no update is available
-    if (!appState.updateAvailable) {
-        checkGameStatus();
-    }
+
+    // Reset update flags when hiding notification (including on error)
+    appState.updateAvailable = false;
+    appState.updateVersion = null;
+    appState.updateDownloaded = false;
+
+    // Restore normal button state
+    checkGameStatus();
 }
 
 function showUpdateNotification(version) {
@@ -1083,6 +1100,7 @@ function showUpdateNotification(version) {
     console.log(`Update available: v${version}`);
     appState.updateAvailable = true;
     appState.updateVersion = version;
+    appState.updateDownloaded = false; // Not yet downloaded
     updateGameStatus('warning', `🔄 Launcher update available: v${version}`);
     updateMainActionButton('update', `💾 Download Update v${version}`, true);
 }
@@ -1107,9 +1125,10 @@ function showUpdateReady(version) {
     // Hide progress bar
     elements.progressContainer.style.display = 'none';
 
-    // Keep update flags set - we still have an update ready
+    // Mark update as downloaded and ready to install
     appState.updateAvailable = true;
     appState.updateVersion = version;
+    appState.updateDownloaded = true;
 
     // Update main action button to install update
     updateGameStatus('success', `✅ Update v${version} ready to install!`);
