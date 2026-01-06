@@ -474,7 +474,10 @@ ipcMain.handle('download-update', async () => {
 });
 
 ipcMain.handle('install-update', () => {
-    autoUpdater.quitAndInstall(false, true);
+    // Quit, install, and automatically restart the app (like Discord)
+    // isSilent=true: don't show dialogs during installation
+    // isForceRunAfter=true: automatically restart after install
+    autoUpdater.quitAndInstall(true, true);
 });
 
 // Window controls for frameless window

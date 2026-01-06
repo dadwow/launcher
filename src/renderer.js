@@ -206,7 +206,10 @@ const appState = {
     isDownloading: false,
     downloadPaused: false,
     realmAddress: '',
-    wineInfo: null
+    wineInfo: null,
+    updateAvailable: false,
+    updateVersion: null,
+    updateDownloaded: false
 };
 
 console.log('App state initialized');
@@ -464,6 +467,12 @@ function closeSettingsModal() {
 
 // Check game installation status
 async function checkGameStatus() {
+    // Don't override button if launcher update is available
+    if (appState.updateAvailable) {
+        console.log('Launcher update available, skipping game status check for button');
+        return;
+    }
+
     if (!appState.installPath) {
         updateGameStatus('warning', 'Please configure installation path in Options.');
         updateMainActionButton('configure', 'Configure Settings', false);
@@ -622,7 +631,30 @@ async function handleMainAction() {
             await launchWow();
             break;
         case 'update':
-            await window.electronAPI.installUpdate();
+            // Check if update is already downloaded
+            if (appState.updateDownloaded) {
+                // Update is downloaded, install and restart
+                await window.electronAPI.installUpdate();
+            } else {
+                // Download the update first
+                try {
+                    // Explicitly mark update as not yet downloaded while we (re)start download
+                    appState.updateDownloaded = false;
+                    updateMainActionButton('update', '⏳ Downloading...', false);
+                    await window.electronAPI.downloadUpdate();
+                    // The 'update-status' listener will handle UI updates
+                    // when download completes
+                } catch (error) {
+                    console.error('Failed to download update:', error);
+                    showError('Failed to download update: ' + error.message);
+                    // Reset update flags on error
+                    appState.updateAvailable = false;
+                    appState.updateVersion = null;
+                    appState.updateDownloaded = false;
+                    // Restore normal button state
+                    checkGameStatus();
+                }
+            }
             break;
         default:
             console.warn('Unknown button state:', buttonState);
@@ -1046,14 +1078,24 @@ function showUpdateChecking() {
 function hideUpdateNotification() {
     // Don't show notification modal - updates handled through main UI
     console.log('Update notification hidden');
-    checkGameStatus(); // Restore normal button state
+
+    // Reset update flags when hiding notification (including on error)
+    appState.updateAvailable = false;
+    appState.updateVersion = null;
+    appState.updateDownloaded = false;
+
+    // Restore normal button state
+    checkGameStatus();
 }
 
 function showUpdateNotification(version) {
     // Don't show modal - use main button and status instead
     console.log(`Update available: v${version}`);
+    appState.updateAvailable = true;
+    appState.updateVersion = version;
+    appState.updateDownloaded = false; // Not yet downloaded
     updateGameStatus('warning', `🔄 Launcher update available: v${version}`);
-    updateMainActionButton('update', `⬇️ Download Update v${version}`, true);
+    updateMainActionButton('update', `💾 Download Update v${version}`, true);
 }
 
 function updateDownloadProgress(data) {
@@ -1076,9 +1118,14 @@ function showUpdateReady(version) {
     // Hide progress bar
     elements.progressContainer.style.display = 'none';
 
+    // Mark update as downloaded and ready to install
+    appState.updateAvailable = true;
+    appState.updateVersion = version;
+    appState.updateDownloaded = true;
+
     // Update main action button to install update
     updateGameStatus('success', `✅ Update v${version} ready to install!`);
-    updateMainActionButton('update', `🎉 Install Update v${version}`, true);
+    updateMainActionButton('update', `🔄 Restart & Install v${version}`, true);
 }
 
 // Clean up event listeners when the page unloads
