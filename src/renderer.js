@@ -356,6 +356,44 @@ function setupEventListeners() {
     // Wine installation progress listener
     window.electronAPI.onWineInstallProgress(handleWineInstallProgress);
 
+    // Forward addon install progress to settings iframe (if open)
+    if (window.electronAPI.onAddonInstallProgress) {
+        window.electronAPI.onAddonInstallProgress((_event, data) => {
+            if (
+                elements.settingsIframe &&
+                elements.settingsModal &&
+                elements.settingsModal.style.display === 'flex'
+            ) {
+                try {
+                    elements.settingsIframe.contentWindow.postMessage(
+                        { type: 'addonInstallProgress', data },
+                        '*'
+                    );
+                } catch (e) {
+                    console.warn('Failed to forward addon install progress to iframe:', e);
+                }
+            }
+        });
+    }
+    if (window.electronAPI.onAddonInstallComplete) {
+        window.electronAPI.onAddonInstallComplete((_event, data) => {
+            if (
+                elements.settingsIframe &&
+                elements.settingsModal &&
+                elements.settingsModal.style.display === 'flex'
+            ) {
+                try {
+                    elements.settingsIframe.contentWindow.postMessage(
+                        { type: 'addonInstallComplete', data },
+                        '*'
+                    );
+                } catch (e) {
+                    console.warn('Failed to forward addon install completion to iframe:', e);
+                }
+            }
+        });
+    }
+
     // Update check progress listeners
     window.electronAPI.onUpdateCheckStarting(() => {
         console.log('Initial update check starting...');
@@ -394,6 +432,8 @@ async function openSettings() {
 
             // Load iframe content only when opening
             if (elements.settingsIframe) {
+                // Set iframe src directly without any sandbox restrictions
+                // This ensures clipboard operations work properly
                 elements.settingsIframe.src = 'options.html';
 
                 // Wait for iframe to load, then pass data to it

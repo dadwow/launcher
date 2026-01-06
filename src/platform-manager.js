@@ -352,30 +352,43 @@ class PlatformManager {
 
             // 1. Install rosettax87 service to WoW directory
             const rosettax87Dir = path.join(installPath, 'rosettax87');
-            await fs.ensureDir(rosettax87Dir);
+            const rosettax87Path = path.join(rosettax87Dir, 'rosettax87');
+            const libRuntimePath = path.join(rosettax87Dir, 'libRuntimeRosettax87');
 
-            const rosettax87Files = [
-                { src: 'rosettax87', dest: 'rosettax87', executable: true },
-                { src: 'libRuntimeRosettax87', dest: 'libRuntimeRosettax87', executable: false }
-            ];
+            // Check if rosettax87 files already exist
+            const rosettax87Exists = await fs.pathExists(rosettax87Path);
+            const libRuntimeExists = await fs.pathExists(libRuntimePath);
 
-            for (const file of rosettax87Files) {
-                const srcPath = path.join(resourcesPath, 'rosettax87', file.src);
-                const destPath = path.join(rosettax87Dir, file.dest);
+            if (rosettax87Exists && libRuntimeExists) {
+                console.log('✅ rosettax87 files already installed, skipping');
+                result.rosettax87 = true;
+                result.rosettax87Path = rosettax87Path;
+            } else {
+                await fs.ensureDir(rosettax87Dir);
 
-                if (await fs.pathExists(srcPath)) {
-                    await fs.copy(srcPath, destPath, { overwrite: true });
-                    if (file.executable) {
-                        await fs.chmod(destPath, 0o755);
+                const rosettax87Files = [
+                    { src: 'rosettax87', dest: 'rosettax87', executable: true },
+                    { src: 'libRuntimeRosettax87', dest: 'libRuntimeRosettax87', executable: false }
+                ];
+
+                for (const file of rosettax87Files) {
+                    const srcPath = path.join(resourcesPath, 'rosettax87', file.src);
+                    const destPath = path.join(rosettax87Dir, file.dest);
+
+                    if (await fs.pathExists(srcPath)) {
+                        await fs.copy(srcPath, destPath, { overwrite: true });
+                        if (file.executable) {
+                            await fs.chmod(destPath, 0o755);
+                        }
+                        console.log(`Installed ${file.src} to ${destPath}`);
+                    } else {
+                        throw new Error(`Bundled file not found: ${srcPath}`);
                     }
-                    console.log(`Installed ${file.src} to ${destPath}`);
-                } else {
-                    throw new Error(`Bundled file not found: ${srcPath}`);
                 }
-            }
 
-            result.rosettax87 = true;
-            result.rosettax87Path = path.join(rosettax87Dir, 'rosettax87');
+                result.rosettax87 = true;
+                result.rosettax87Path = rosettax87Path;
+            }
 
             // 2. Install winerosetta.dll using NEW METHOD ONLY
             // ⚠️  We do NOT install libDllLdr.dll - it's the OLD slow method!
@@ -387,27 +400,42 @@ class PlatformManager {
             const divxBackupPath = path.join(installPath, 'DivxDecoder.dll.backup');
 
             if (await fs.pathExists(winerosettaSrc)) {
-                // Backup original DivxDecoder.dll if it exists and isn't already backed up
-                if (
-                    (await fs.pathExists(divxDecoderPath)) &&
-                    !(await fs.pathExists(divxBackupPath))
-                ) {
+                // Check if DivxDecoder.dll is already the winerosetta version
+                const divxExists = await fs.pathExists(divxDecoderPath);
+                let needsInstall = true;
+
+                if (divxExists) {
                     const stats = await fs.stat(divxDecoderPath);
-                    // Only backup if it's the original 404KB codec DLL (not already winerosetta)
-                    if (stats.size > 100000) {
-                        // Original is ~404KB, winerosetta is ~11KB
-                        await fs.copy(divxDecoderPath, divxBackupPath, { overwrite: false });
-                        console.log(`✅ Backed up original DivxDecoder.dll (${stats.size} bytes)`);
+                    // winerosetta.dll is ~11KB, original DivxDecoder is ~404KB
+                    if (stats.size < 50000) {
+                        console.log(
+                            '✅ winerosetta.dll already installed as DivxDecoder.dll, skipping'
+                        );
+                        needsInstall = false;
                     }
                 }
 
-                // Replace DivxDecoder.dll with winerosetta.dll (direct import method)
-                await fs.copy(winerosettaSrc, divxDecoderPath, { overwrite: true });
-                console.log(
-                    '✅ Installed winerosetta.dll as DivxDecoder.dll (NEW performant method)'
-                );
-                console.log('   🎯 Direct WoW import (no DLL injection overhead)');
-                console.log('   ⚡ ~3x faster than old libDllLdr.dll method');
+                if (needsInstall) {
+                    // Backup original DivxDecoder.dll if it exists and isn't already backed up
+                    if (divxExists && !(await fs.pathExists(divxBackupPath))) {
+                        const stats = await fs.stat(divxDecoderPath);
+                        // Only backup if it's the original 404KB codec DLL (not winerosetta)
+                        if (stats.size > 100000) {
+                            // Original is ~404KB, winerosetta is ~11KB
+                            await fs.copy(divxDecoderPath, divxBackupPath, { overwrite: false });
+                            const msg = `✅ Backed up original DivxDecoder.dll (${stats.size} bytes)`;
+                            console.log(msg);
+                        }
+                    }
+
+                    // Replace DivxDecoder.dll with winerosetta.dll (direct import method)
+                    await fs.copy(winerosettaSrc, divxDecoderPath, { overwrite: true });
+                    console.log(
+                        '✅ Installed winerosetta.dll as DivxDecoder.dll (NEW performant method)'
+                    );
+                    console.log('   🎯 Direct WoW import (no DLL injection overhead)');
+                    console.log('   ⚡ ~3x faster than old libDllLdr.dll method');
+                }
             }
 
             // 3. Install d3d9.dll (DirectX9 to Vulkan/Metal translation)
@@ -415,8 +443,13 @@ class PlatformManager {
             const d3d9Dest = path.join(installPath, 'd3d9.dll');
 
             if (await fs.pathExists(d3d9Src)) {
-                await fs.copy(d3d9Src, d3d9Dest, { overwrite: true });
-                console.log('Installed d3d9.dll for graphics optimization');
+                const d3d9Exists = await fs.pathExists(d3d9Dest);
+                if (d3d9Exists) {
+                    console.log('✅ d3d9.dll already installed, skipping');
+                } else {
+                    await fs.copy(d3d9Src, d3d9Dest, { overwrite: true });
+                    console.log('Installed d3d9.dll for graphics optimization');
+                }
             }
 
             // 4. Patch CrossOver to create wineloader2
@@ -430,11 +463,15 @@ class PlatformManager {
 
                 const wineloaderOrig = path.join(
                     crossoverApp,
-                    'Contents/SharedSupport/CrossOver/CrossOver-Hosted Application/wineloader'
+                    'Contents/SharedSupport/CrossOver',
+                    'CrossOver-Hosted Application',
+                    'wineloader'
                 );
                 const wineloader2Path = path.join(
                     crossoverApp,
-                    'Contents/SharedSupport/CrossOver/CrossOver-Hosted Application/wineloader2'
+                    'Contents/SharedSupport/CrossOver',
+                    'CrossOver-Hosted Application',
+                    'wineloader2'
                 );
 
                 if (await fs.pathExists(wineloaderOrig)) {
@@ -452,6 +489,8 @@ class PlatformManager {
                         } catch (err) {
                             result.errors.push(`Failed to remove code signature: ${err.message}`);
                         }
+                    } else {
+                        console.log('✅ wineloader2 already exists, skipping');
                     }
 
                     result.wineloader2 = await fs.pathExists(wineloader2Path);
@@ -459,7 +498,7 @@ class PlatformManager {
                 }
             }
 
-            console.log('TurtleSilicon patches installed successfully');
+            console.log('TurtleSilicon patches verified/installed successfully');
             return result;
         } catch (error) {
             result.errors.push(error.message);

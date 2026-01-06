@@ -4,7 +4,9 @@ const fs = require('fs-extra');
 const os = require('os');
 const axios = require('axios');
 const StreamZip = require('node-stream-zip');
-const { spawn } = require('child_process');
+// Use a pure JS git client to avoid requiring system git
+const git = require('isomorphic-git');
+const http = require('isomorphic-git/http/node');
 
 // Handle uncaught exceptions (especially EPIPE errors from broken pipes)
 process.on('uncaughtException', error => {
@@ -947,6 +949,206 @@ ipcMain.handle('validate-addon-repo', async (event, owner, repo) => {
     }
 });
 
+// Get GitHub repo info
+ipcMain.handle('get-repo-info', async (event, owner, repo) => {
+    try {
+        const response = await axios.get(`https://api.github.com/repos/${owner}/${repo}`, {
+            headers: { 'User-Agent': 'PlusCraft-Launcher' }
+        });
+
+        const data = response.data;
+        return {
+            name: data.name,
+            fullName: data.full_name,
+            description: data.description,
+            stars: data.stargazers_count,
+            forks: data.forks_count,
+            language: data.language,
+            updatedAt: data.updated_at,
+            defaultBranch: data.default_branch,
+            homepage: data.homepage,
+            topics: data.topics
+        };
+    } catch (error) {
+        console.error('Error fetching repo info:', error.message);
+        throw new Error(error.response?.status === 404 ? 'Repository not found' : error.message);
+    }
+});
+
+// Validate addon repository without requiring GitHub API (uses git refs)
+ipcMain.handle('validateAddonRepo', async (event, owner, repo) => {
+    try {
+        const url = `https://github.com/${owner}/${repo}.git`;
+        // Attempt to list refs to confirm repository exists and is reachable
+        const refs = await git.listServerRefs({ http, url });
+        const hasRefs = Array.isArray(refs) && refs.length > 0;
+        if (hasRefs) {
+            return { valid: true, addonInfo: { hasTocInRoot: false } };
+        }
+        return { valid: false, error: 'Repository unreachable or has no refs' };
+    } catch (error) {
+        // Treat rate limits or network errors as non-fatal for validation
+        return { valid: true, note: `Validation fallback: ${error.message}` };
+    }
+});
+
+// Get GitHub repo branches
+ipcMain.handle('get-repo-branches', async (event, owner, repo) => {
+    try {
+        const response = await axios.get(`https://api.github.com/repos/${owner}/${repo}/branches`, {
+            headers: { 'User-Agent': 'PlusCraft-Launcher' }
+        });
+
+        return response.data.map(branch => ({
+            name: branch.name,
+            commit: {
+                sha: branch.commit.sha,
+                url: branch.commit.url
+            },
+            protected: branch.protected
+        }));
+    } catch (error) {
+        console.error('Error fetching branches:', error.message);
+        throw new Error(error.response?.status === 404 ? 'Repository not found' : error.message);
+    }
+});
+
+// Get GitHub repo README
+ipcMain.handle('get-repo-readme', async (event, owner, repo) => {
+    try {
+        const response = await axios.get(`https://api.github.com/repos/${owner}/${repo}/readme`, {
+            headers: {
+                'User-Agent': 'PlusCraft-Launcher',
+                Accept: 'application/vnd.github.v3.raw'
+            }
+        });
+
+        return response.data;
+    } catch (error) {
+        console.error('Error fetching README:', error.message);
+        if (error.response?.status === 404) {
+            return null; // No README found
+        }
+        throw new Error(error.message);
+    }
+});
+
+// Check for addon updates
+ipcMain.handle('check-addon-updates', async (event, installPath) => {
+    try {
+        const addonsPath = path.join(installPath, 'Interface', 'AddOns');
+        const addonDirs = await fs.readdir(addonsPath);
+
+        const updates = [];
+
+        for (const dir of addonDirs) {
+            const addonPath = path.join(addonsPath, dir);
+            const stat = await fs.stat(addonPath);
+
+            if (!stat.isDirectory()) continue;
+
+            // Check for .github-repo file
+            const repoFilePath = path.join(addonPath, '.github-repo');
+            const metadataPath = path.join(addonPath, '.github-addon-metadata');
+
+            if (await fs.pathExists(repoFilePath)) {
+                try {
+                    const repoContent = await fs.readFile(repoFilePath, 'utf8');
+                    const [owner, repo] = repoContent.trim().split('/');
+
+                    if (!owner || !repo) continue;
+
+                    // Get current metadata (if exists)
+                    let currentCommit = null;
+                    let currentBranch = 'main';
+                    if (await fs.pathExists(metadataPath)) {
+                        const metadata = await fs.readJson(metadataPath);
+                        currentCommit = metadata.commitHash;
+                        currentBranch = metadata.branch || 'main';
+                    }
+
+                    // Get latest commit from GitHub
+                    const response = await axios.get(
+                        `https://api.github.com/repos/${owner}/${repo}/commits/${currentBranch}`,
+                        {
+                            headers: { 'User-Agent': 'PlusCraft-Launcher' }
+                        }
+                    );
+
+                    const latestCommit = response.data.sha;
+                    const latestCommitShort = latestCommit.substring(0, 7);
+
+                    // Check if update is available
+                    if (!currentCommit || currentCommit !== latestCommit) {
+                        updates.push({
+                            addonName: dir,
+                            owner,
+                            repo,
+                            currentCommit: currentCommit
+                                ? currentCommit.substring(0, 7)
+                                : 'unknown',
+                            latestCommit: latestCommitShort,
+                            latestCommitFull: latestCommit,
+                            branch: currentBranch,
+                            hasUpdate: true
+                        });
+                    }
+                } catch (error) {
+                    console.error(`Error checking updates for ${dir}:`, error.message);
+                }
+            }
+        }
+
+        return updates;
+    } catch (error) {
+        console.error('Error checking for updates:', error);
+        throw new Error(error.message);
+    }
+});
+
+// Update a specific addon
+ipcMain.handle('update-addon', async (event, addonName, installPath) => {
+    try {
+        const addonPath = path.join(installPath, 'Interface', 'AddOns', addonName);
+        const repoFilePath = path.join(addonPath, '.github-repo');
+
+        if (!(await fs.pathExists(repoFilePath))) {
+            throw new Error('Addon does not have GitHub repository information');
+        }
+
+        const repoContent = await fs.readFile(repoFilePath, 'utf8');
+        const [owner, repo] = repoContent.trim().split('/');
+
+        if (!owner || !repo) {
+            throw new Error('Invalid repository information');
+        }
+
+        // Get current branch if available
+        const metadataPath = path.join(addonPath, '.github-addon-metadata');
+        let branch = 'main';
+        if (await fs.pathExists(metadataPath)) {
+            const metadata = await fs.readJson(metadataPath);
+            branch = metadata.branch || 'main';
+        }
+
+        // Uninstall current version
+        await fs.remove(addonPath);
+
+        // Reinstall from GitHub
+        const addonsPath = path.join(installPath, 'Interface', 'AddOns');
+        const hasGit = await checkGitAvailable();
+
+        if (hasGit) {
+            return await installAddonWithGit(owner, repo, addonsPath, branch);
+        } else {
+            return await installAddonWithArchive(owner, repo, addonsPath, branch);
+        }
+    } catch (error) {
+        console.error('Error updating addon:', error);
+        throw new Error(error.message);
+    }
+});
+
 // Realmlist management
 ipcMain.handle('update-realmlist', async (event, installPath, realmAddress) => {
     try {
@@ -1107,7 +1309,7 @@ async function extractZipFile(zipPath, extractPath) {
 }
 
 // Addon management IPC handlers
-ipcMain.handle('install-addon-from-github', async (event, owner, repo, installPath) => {
+ipcMain.handle('install-addon-from-github', async (event, owner, repo, installPath, branch) => {
     try {
         const addonPath = path.join(installPath, 'Interface', 'AddOns');
         await fs.ensureDir(addonPath);
@@ -1117,10 +1319,10 @@ ipcMain.handle('install-addon-from-github', async (event, owner, repo, installPa
 
         if (hasGit) {
             console.log('Using git clone for addon installation');
-            return await installAddonWithGit(owner, repo, addonPath);
+            return await installAddonWithGit(owner, repo, addonPath, branch);
         } else {
             console.log('Git not available, falling back to archive download');
-            return await installAddonWithArchive(owner, repo, addonPath);
+            return await installAddonWithArchive(owner, repo, addonPath, branch);
         }
     } catch (error) {
         console.error('Addon installation error:', error);
@@ -1128,60 +1330,94 @@ ipcMain.handle('install-addon-from-github', async (event, owner, repo, installPa
     }
 });
 
-// Check if git is available on the system
+// With isomorphic-git we don't require system git
 async function checkGitAvailable() {
-    return new Promise(resolve => {
-        const gitCheck = spawn('git', ['--version']);
-        gitCheck.on('close', code => {
-            resolve(code === 0);
-        });
-        gitCheck.on('error', () => {
-            resolve(false);
-        });
-    });
+    return true;
 }
 
 // Install addon using git clone
-async function installAddonWithGit(owner, repo, addonPath) {
+async function installAddonWithGit(owner, repo, addonPath, branch = null) {
     const repoUrl = `https://github.com/${owner}/${repo}.git`;
     const tempClonePath = path.join(addonPath, `temp_${repo}`);
+    const startedAt = Date.now();
+    let lastTick = startedAt;
+    let lastLoaded = 0;
 
     // Remove temp directory if it exists
     if (await fs.pathExists(tempClonePath)) {
         await fs.remove(tempClonePath);
     }
 
-    console.log(`Cloning ${repoUrl} to ${tempClonePath}`);
-
-    // Clone the repository
-    await new Promise((resolve, reject) => {
-        const gitClone = spawn('git', ['clone', '--depth', '1', repoUrl, tempClonePath]);
-
-        gitClone.stdout.on('data', data => {
-            console.log(`git: ${data}`);
+    console.log(`Cloning ${repoUrl} to ${tempClonePath}${branch ? ` (branch: ${branch})` : ''}`);
+    // Clone using isomorphic-git (no system git required)
+    await fs.ensureDir(tempClonePath);
+    if (mainWindow) {
+        mainWindow.webContents.send('addon-install-progress', {
+            status: 'Starting clone...',
+            percent: 0,
+            speed: 0
         });
+    }
 
-        gitClone.stderr.on('data', data => {
-            console.log(`git: ${data}`);
-        });
-
-        gitClone.on('close', code => {
-            if (code === 0) {
-                resolve();
-            } else {
-                reject(new Error(`Git clone failed with code ${code}`));
+    await git.clone({
+        fs,
+        http,
+        url: repoUrl,
+        dir: tempClonePath,
+        singleBranch: true,
+        depth: 1,
+        ...(branch ? { ref: branch } : {}),
+        onProgress: evt => {
+            if (evt && evt.phase) {
+                const now = Date.now();
+                let percent = null;
+                let speed = null;
+                if (evt.total && evt.loaded !== null) {
+                    const ratio = evt.loaded / evt.total;
+                    percent = Math.max(0, Math.min(100, Math.floor(ratio * 100)));
+                    const dt = (now - lastTick) / 1000;
+                    const dl = Math.max(0, evt.loaded - lastLoaded);
+                    if (dt > 0) speed = dl / dt; // units depend on isomorphic-git reporting
+                    lastTick = now;
+                    lastLoaded = evt.loaded;
+                }
+                if (mainWindow) {
+                    mainWindow.webContents.send('addon-install-progress', {
+                        status: evt.phase,
+                        percent,
+                        speed
+                    });
+                }
+                const pctText = percent !== null ? ` ${percent}%` : '';
+                const spdText = speed !== null ? ` @ ${Math.round(speed)} u/s` : '';
+                console.log(`git: ${evt.phase}${pctText}${spdText}`);
             }
-        });
-
-        gitClone.on('error', error => {
-            reject(error);
-        });
+        }
     });
+
+    // Get current commit hash and branch using isomorphic-git
+    let commitHash = null;
+    let actualBranch = branch || 'main';
+    try {
+        commitHash = await git.resolveRef({ fs, dir: tempClonePath, ref: 'HEAD' });
+        const current = await git.currentBranch({ fs, dir: tempClonePath, fullname: false });
+        if (current) actualBranch = current;
+    } catch (error) {
+        console.error('Error getting commit info:', error);
+    }
 
     // Remove .git directory to save space
     const gitDir = path.join(tempClonePath, '.git');
     if (await fs.pathExists(gitDir)) {
         await fs.remove(gitDir);
+    }
+
+    if (mainWindow) {
+        mainWindow.webContents.send('addon-install-progress', {
+            status: 'Clone complete',
+            percent: 100,
+            speed: 0
+        });
     }
 
     // Check if the cloned folder contains .toc file(s)
@@ -1199,37 +1435,59 @@ async function installAddonWithGit(owner, repo, addonPath) {
 
         await fs.move(tempClonePath, targetPath);
 
+        // Store GitHub repo info
+        const repoFile = path.join(targetPath, '.github-repo');
+        await fs.writeFile(repoFile, `${owner}/${repo}`, 'utf8');
+
         // Store metadata for update tracking
         const metadataPath = path.join(targetPath, '.github-addon-metadata');
         await fs.writeJson(metadataPath, {
             owner,
             repo,
             installedAt: new Date().toISOString(),
-            method: 'git'
+            method: 'git',
+            commitHash,
+            branch: actualBranch
         });
 
         console.log(`Installed addon: ${repo}`);
+        if (mainWindow) {
+            mainWindow.webContents.send('addon-install-complete', { success: true });
+        }
         return { success: true, addons: [repo] };
     } else {
-        // Check for multiple addon folders in subdirectories
+        // Recursively search for addon folders (directories containing .toc files)
         const addonFolders = [];
-        for (const item of clonedContents) {
-            const itemPath = path.join(tempClonePath, item);
-            const stat = await fs.stat(itemPath);
-            if (stat.isDirectory() && !item.startsWith('.')) {
-                const subContents = await fs.readdir(itemPath);
-                const tocFiles = subContents.filter(f => f.endsWith('.toc'));
-                if (tocFiles.length > 0) {
-                    addonFolders.push(item);
+        async function findAddonFolders(searchPath, currentDepth = 0) {
+            try {
+                const contents = await fs.readdir(searchPath);
+                for (const item of contents) {
+                    if (item.startsWith('.')) continue; // Skip hidden
+                    const itemPath = path.join(searchPath, item);
+                    const stat = await fs.stat(itemPath);
+                    if (stat.isDirectory()) {
+                        const subContents = await fs.readdir(itemPath);
+                        const tocFiles = subContents.filter(f => f.endsWith('.toc'));
+                        if (tocFiles.length > 0) {
+                            const relativePath = path.relative(tempClonePath, itemPath);
+                            addonFolders.push(relativePath);
+                        } else if (currentDepth < 4) {
+                            await findAddonFolders(itemPath, currentDepth + 1);
+                        }
+                    }
                 }
+            } catch (err) {
+                console.error(`Error searching in ${searchPath}:`, err.message);
             }
         }
+        await findAddonFolders(tempClonePath);
 
         if (addonFolders.length > 0) {
-            // Install each addon folder
-            for (const addonFolder of addonFolders) {
-                const sourcePath = path.join(tempClonePath, addonFolder);
-                const targetPath = path.join(addonPath, addonFolder);
+            // Install each addon folder found (may be nested paths)
+            for (const addonFolderRelPath of addonFolders) {
+                const sourcePath = path.join(tempClonePath, addonFolderRelPath);
+                const addonFolderName = path.basename(addonFolderRelPath);
+                const targetPath = path.join(addonPath, addonFolderName);
 
                 if (await fs.pathExists(targetPath)) {
                     await fs.remove(targetPath);
@@ -1237,22 +1495,32 @@ async function installAddonWithGit(owner, repo, addonPath) {
 
                 await fs.move(sourcePath, targetPath);
 
+                // Store GitHub repo info
+                const repoFile = path.join(targetPath, '.github-repo');
+                await fs.writeFile(repoFile, `${owner}/${repo}`, 'utf8');
+
                 // Store metadata
                 const metadataPath = path.join(targetPath, '.github-addon-metadata');
                 await fs.writeJson(metadataPath, {
                     owner,
                     repo,
                     installedAt: new Date().toISOString(),
-                    method: 'git'
+                    method: 'git',
+                    commitHash,
+                    branch: actualBranch
                 });
 
-                console.log(`Installed addon: ${addonFolder}`);
+                console.log(`Installed addon: ${addonFolderName}`);
             }
 
             // Clean up temp directory
             await fs.remove(tempClonePath);
 
-            return { success: true, addons: addonFolders };
+            const installed = addonFolders.map(p => path.basename(p));
+            if (mainWindow) {
+                mainWindow.webContents.send('addon-install-complete', { success: true });
+            }
+            return { success: true, addons: installed };
         } else {
             throw new Error(
                 'Could not find any .toc files. This does not appear to be a valid WoW addon.'
@@ -1262,29 +1530,31 @@ async function installAddonWithGit(owner, repo, addonPath) {
 }
 
 // Install addon using archive download (fallback method)
-async function installAddonWithArchive(owner, repo, addonPath) {
+async function installAddonWithArchive(owner, repo, addonPath, branch = null) {
     try {
         // Get repository information to find the default branch
         let defaultBranch = 'main';
-        try {
-            const repoInfoResponse = await axios.get(
-                `https://api.github.com/repos/${owner}/${repo}`
-            );
-            defaultBranch = repoInfoResponse.data.default_branch || 'main';
-            console.log(`Default branch for ${owner}/${repo}: ${defaultBranch}`);
-        } catch {
-            console.log('Could not get repo info, trying common branches...');
+        if (!branch) {
+            try {
+                const repoInfoResponse = await axios.get(
+                    `https://api.github.com/repos/${owner}/${repo}`
+                );
+                defaultBranch = repoInfoResponse.data.default_branch || 'main';
+                console.log(`Default branch for ${owner}/${repo}: ${defaultBranch}`);
+            } catch {
+                console.log('Could not get repo info, trying common branches...');
+            }
         }
 
         // Try to download addon from GitHub as ZIP
-        const possibleBranches = [defaultBranch, 'main', 'master'];
+        const possibleBranches = branch ? [branch] : [defaultBranch, 'main', 'master'];
         let downloadUrl = null;
         let zipPath = null;
         let branchUsed = null;
 
-        for (const branch of possibleBranches) {
+        for (const branchToTry of possibleBranches) {
             try {
-                downloadUrl = `https://github.com/${owner}/${repo}/archive/refs/heads/${branch}.zip`;
+                downloadUrl = `https://github.com/${owner}/${repo}/archive/refs/heads/${branchToTry}.zip`;
                 zipPath = path.join(addonPath, `${repo}.zip`);
 
                 console.log(`Trying to download from: ${downloadUrl}`);
@@ -1297,6 +1567,32 @@ async function installAddonWithArchive(owner, repo, addonPath) {
                 });
 
                 const writer = fs.createWriteStream(zipPath);
+                const totalBytes = Number(response.headers['content-length'] || 0);
+                let downloaded = 0;
+                let lastTick = Date.now();
+                let lastDownloaded = 0;
+                response.data.on('data', chunk => {
+                    downloaded += chunk.length;
+                    const now = Date.now();
+                    const dt = (now - lastTick) / 1000;
+                    if (dt >= 0.5) {
+                        const delta = downloaded - lastDownloaded;
+                        const speed = delta / dt; // bytes/sec
+                        const ratio = totalBytes ? downloaded / totalBytes : 0;
+                        const percent = totalBytes
+                            ? Math.max(0, Math.min(100, Math.floor(ratio * 100)))
+                            : null;
+                        if (mainWindow) {
+                            mainWindow.webContents.send('addon-install-progress', {
+                                status: 'Downloading archive',
+                                percent,
+                                speed
+                            });
+                        }
+                        lastTick = now;
+                        lastDownloaded = downloaded;
+                    }
+                });
                 response.data.pipe(writer);
 
                 await new Promise((resolve, reject) => {
@@ -1304,11 +1600,18 @@ async function installAddonWithArchive(owner, repo, addonPath) {
                     writer.on('error', reject);
                 });
 
-                branchUsed = branch;
-                console.log(`Successfully downloaded from branch: ${branch}`);
+                branchUsed = branchToTry;
+                console.log(`Successfully downloaded from branch: ${branchToTry}`);
+                if (mainWindow) {
+                    mainWindow.webContents.send('addon-install-progress', {
+                        status: 'Download complete',
+                        percent: 100,
+                        speed: 0
+                    });
+                }
                 break;
             } catch {
-                console.log(`Branch ${branch} not found, trying next...`);
+                console.log(`Branch ${branchToTry} not found, trying next...`);
                 if (await fs.pathExists(zipPath)) {
                     await fs.remove(zipPath);
                 }
@@ -1408,6 +1711,8 @@ async function installAddonWithArchive(owner, repo, addonPath) {
         // Collect installed addon names
         const installedAddons = addonFolders.length > 0 ? addonFolders : [repo];
 
+        console.log('Writing .github-repo files for addons:', installedAddons);
+
         // Save GitHub repo info and commit SHA for future updates
         const commitsUrl = `https://api.github.com/repos/${owner}/${repo}/commits/${branchUsed}`;
         const commitsResponse = await axios.get(commitsUrl, {
@@ -1419,6 +1724,7 @@ async function installAddonWithArchive(owner, repo, addonPath) {
             const addonTargetPath = path.join(addonPath, addonFolder);
             const repoFile = path.join(addonTargetPath, '.github-repo');
             await fs.writeFile(repoFile, `${owner}/${repo}`, 'utf8');
+            console.log(`Created .github-repo for ${addonFolder}: ${owner}/${repo}`);
 
             const commitFile = path.join(addonTargetPath, '.github-commit');
             await fs.writeFile(commitFile, latestCommit, 'utf8');
@@ -1430,221 +1736,26 @@ async function installAddonWithArchive(owner, repo, addonPath) {
                 repo,
                 installedAt: new Date().toISOString(),
                 method: 'archive',
-                commit: latestCommit
+                commitHash: latestCommit,
+                branch: branchUsed
             });
         }
 
+        if (mainWindow) {
+            mainWindow.webContents.send('addon-install-complete', { success: true });
+        }
         return { success: true, addons: installedAddons };
     } catch (error) {
         console.error('Archive installation error:', error);
+        if (mainWindow) {
+            mainWindow.webContents.send('addon-install-complete', {
+                success: false,
+                error: error.message
+            });
+        }
         throw error;
     }
 }
-
-// Check for addon updates
-ipcMain.handle('check-addon-updates', async (event, addons) => {
-    try {
-        const updates = [];
-
-        for (const addon of addons) {
-            if (!addon.githubRepo) continue;
-
-            const [owner, repo] = addon.githubRepo.split('/');
-
-            try {
-                // Get latest commit from default branch
-                const repoInfoUrl = `https://api.github.com/repos/${owner}/${repo}`;
-                const repoInfoResponse = await axios.get(repoInfoUrl, {
-                    headers: { 'User-Agent': 'WoW-Launcher' }
-                });
-                const defaultBranch = repoInfoResponse.data.default_branch;
-
-                const commitsUrl = `https://api.github.com/repos/${owner}/${repo}/commits/${defaultBranch}`;
-                const commitsResponse = await axios.get(commitsUrl, {
-                    headers: { 'User-Agent': 'WoW-Launcher' }
-                });
-
-                const latestCommit = commitsResponse.data.sha;
-                const latestDate = commitsResponse.data.commit.committer.date;
-
-                // Check if addon folder has stored commit info
-                const commitFile = path.join(addon.path, '.github-commit');
-                let currentCommit = null;
-
-                if (await fs.pathExists(commitFile)) {
-                    currentCommit = (await fs.readFile(commitFile, 'utf8')).trim();
-                }
-
-                // If no commit file or commits differ, update is available
-                if (!currentCommit || currentCommit !== latestCommit) {
-                    updates.push({
-                        name: addon.name,
-                        path: addon.path,
-                        githubRepo: addon.githubRepo,
-                        currentVersion: addon.version,
-                        hasUpdate: true,
-                        latestDate: new Date(latestDate).toLocaleDateString()
-                    });
-                } else {
-                    updates.push({
-                        name: addon.name,
-                        path: addon.path,
-                        githubRepo: addon.githubRepo,
-                        currentVersion: addon.version,
-                        hasUpdate: false
-                    });
-                }
-            } catch (error) {
-                console.error(`Error checking updates for ${addon.name}:`, error.message);
-                updates.push({
-                    name: addon.name,
-                    path: addon.path,
-                    githubRepo: addon.githubRepo,
-                    currentVersion: addon.version,
-                    hasUpdate: false,
-                    error: error.message
-                });
-            }
-        }
-
-        return { success: true, updates };
-    } catch (error) {
-        console.error('Error checking addon updates:', error);
-        return { success: false, error: error.message };
-    }
-});
-
-// Update a single addon
-ipcMain.handle('update-addon', async (event, githubRepo, installPath) => {
-    try {
-        const [owner, repo] = githubRepo.split('/');
-
-        // Get repo info to find default branch
-        const repoInfoUrl = `https://api.github.com/repos/${owner}/${repo}`;
-        const repoInfoResponse = await axios.get(repoInfoUrl, {
-            headers: { 'User-Agent': 'WoW-Launcher' }
-        });
-        const defaultBranch = repoInfoResponse.data.default_branch;
-
-        // Download latest version
-        const downloadUrl = `https://github.com/${owner}/${repo}/archive/refs/heads/${defaultBranch}.zip`;
-        const zipPath = path.join(app.getPath('temp'), `${repo}-update.zip`);
-
-        const response = await axios({
-            url: downloadUrl,
-            method: 'GET',
-            responseType: 'stream'
-        });
-
-        const writer = fs.createWriteStream(zipPath);
-        response.data.pipe(writer);
-
-        await new Promise((resolve, reject) => {
-            writer.on('finish', resolve);
-            writer.on('error', reject);
-        });
-
-        // Extract addon
-        const tempExtractPath = path.join(app.getPath('temp'), `addon-extract-${Date.now()}`);
-        await fs.ensureDir(tempExtractPath);
-
-        const zip = new StreamZip.async({ file: zipPath });
-        await zip.extract(null, tempExtractPath);
-        await zip.close();
-
-        // Find the source folder (should be repo-branch format)
-        const extractedItems = await fs.readdir(tempExtractPath);
-        if (extractedItems.length === 0) {
-            throw new Error('Extracted archive is empty');
-        }
-
-        let sourcePath = path.join(tempExtractPath, extractedItems[0]);
-        const sourceStats = await fs.stat(sourcePath);
-        if (!sourceStats.isDirectory()) {
-            sourcePath = tempExtractPath;
-        }
-
-        // Ensure AddOns directory exists
-        const addonPath = path.join(installPath, 'Interface', 'AddOns');
-        await fs.ensureDir(addonPath);
-
-        // Find .toc files to determine addon folders
-        const allFiles = await fs.readdir(sourcePath);
-        const addonFolders = [];
-
-        for (const item of allFiles) {
-            const itemPath = path.join(sourcePath, item);
-            const itemStat = await fs.stat(itemPath);
-
-            if (itemStat.isDirectory()) {
-                const subFiles = await fs.readdir(itemPath);
-                const hasToc = subFiles.some(file => file.endsWith('.toc'));
-
-                if (hasToc) {
-                    addonFolders.push(item);
-                }
-            }
-        }
-
-        if (addonFolders.length > 0) {
-            // Install each addon folder separately
-            for (const addonFolder of addonFolders) {
-                const addonSourcePath = path.join(sourcePath, addonFolder);
-                const addonTargetPath = path.join(addonPath, addonFolder);
-
-                // Remove existing installation
-                if (await fs.pathExists(addonTargetPath)) {
-                    await fs.remove(addonTargetPath);
-                }
-
-                // Move addon to final location
-                await fs.move(addonSourcePath, addonTargetPath);
-
-                // Save repo and commit info
-                const repoFile = path.join(addonTargetPath, '.github-repo');
-                await fs.writeFile(repoFile, githubRepo, 'utf8');
-
-                // Get and save latest commit
-                const commitsUrl = `https://api.github.com/repos/${owner}/${repo}/commits/${defaultBranch}`;
-                const commitsResponse = await axios.get(commitsUrl, {
-                    headers: { 'User-Agent': 'WoW-Launcher' }
-                });
-                const latestCommit = commitsResponse.data.sha;
-                const commitFile = path.join(addonTargetPath, '.github-commit');
-                await fs.writeFile(commitFile, latestCommit, 'utf8');
-            }
-        } else {
-            // No .toc files found in subdirectories
-            const targetPath = path.join(addonPath, repo);
-
-            if (await fs.pathExists(targetPath)) {
-                await fs.remove(targetPath);
-            }
-
-            await fs.move(sourcePath, targetPath);
-
-            const repoFile = path.join(targetPath, '.github-repo');
-            await fs.writeFile(repoFile, githubRepo, 'utf8');
-
-            const commitsUrl = `https://api.github.com/repos/${owner}/${repo}/commits/${defaultBranch}`;
-            const commitsResponse = await axios.get(commitsUrl, {
-                headers: { 'User-Agent': 'WoW-Launcher' }
-            });
-            const latestCommit = commitsResponse.data.sha;
-            const commitFile = path.join(targetPath, '.github-commit');
-            await fs.writeFile(commitFile, latestCommit, 'utf8');
-        }
-
-        // Clean up
-        await fs.remove(zipPath);
-        await fs.remove(tempExtractPath);
-
-        return { success: true };
-    } catch (error) {
-        console.error('Error updating addon:', error);
-        return { success: false, error: error.message };
-    }
-});
 
 ipcMain.handle('get-installed-addons', async (event, installPath) => {
     try {
@@ -1664,6 +1775,7 @@ ipcMain.handle('get-installed-addons', async (event, installPath) => {
             if (stat.isDirectory()) {
                 const addon = {
                     name: folder,
+                    folderName: folder,
                     path: folderPath,
                     description: null,
                     version: null,
@@ -1681,13 +1793,28 @@ ipcMain.handle('get-installed-addons', async (event, installPath) => {
                             path.join(folderPath, tocFiles[0]),
                             'utf8'
                         );
+                        // Strip WoW color/reset codes from TOC fields
+                        const stripWowColorCodes = s =>
+                            typeof s === 'string'
+                                ? s
+                                      .replace(/\|c[0-9A-Fa-f]{8}/g, '') // |cAARRGGBB
+                                      .replace(/\|cff[0-9A-Fa-f]{6}/g, '') // |cffRRGGBB
+                                      .replace(/\|r/g, '')
+                                : s;
+
                         const titleMatch = tocContent.match(/## Title: (.+)/);
                         const versionMatch = tocContent.match(/## Version: (.+)/);
                         const notesMatch = tocContent.match(/## Notes: (.+)/);
 
-                        if (titleMatch) addon.name = titleMatch[1].trim();
-                        if (versionMatch) addon.version = versionMatch[1].trim();
-                        if (notesMatch) addon.description = notesMatch[1].trim();
+                        if (titleMatch) {
+                            addon.name = stripWowColorCodes(titleMatch[1].trim());
+                        }
+                        if (versionMatch) {
+                            addon.version = stripWowColorCodes(versionMatch[1].trim());
+                        }
+                        if (notesMatch) {
+                            addon.description = stripWowColorCodes(notesMatch[1].trim());
+                        }
                     } catch {
                         // Ignore TOC reading errors
                     }
@@ -1699,6 +1826,7 @@ ipcMain.handle('get-installed-addons', async (event, installPath) => {
                     try {
                         const repoInfo = await fs.readFile(repoFile, 'utf8');
                         addon.githubRepo = repoInfo.trim();
+                        console.log(`Found .github-repo for ${folder}: ${addon.githubRepo}`);
                     } catch {
                         // Ignore
                     }

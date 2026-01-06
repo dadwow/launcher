@@ -1,4 +1,4 @@
-/* global confirm */
+/* global */
 
 // Setup window controls for frameless window
 document.addEventListener('DOMContentLoaded', () => {
@@ -31,6 +31,32 @@ window.addEventListener('message', event => {
         initializeWithData(event.data.config, event.data.settings).catch(error => {
             console.error('Failed to initialize with data:', error);
         });
+    } else if (event.data.type === 'addonInstallProgress') {
+        try {
+            const data = event.data.data || {};
+            const percent =
+                data.percent !== null && data.percent !== undefined
+                    ? Math.max(0, Math.min(100, Math.floor(data.percent)))
+                    : null;
+            const speedText = formatSpeed ? formatSpeed(data.speed) : '';
+            const baseStatus = data.status || 'Installing';
+            const pctStatus = percent !== null ? ` — ${percent}%` : '';
+            const spdStatus = speedText ? ` @ ${speedText}` : '';
+            updateInstallProgress(
+                percent !== null ? percent : 0,
+                `${baseStatus}${pctStatus}${spdStatus}`
+            );
+        } catch (e) {
+            console.warn('Failed to process addonInstallProgress message:', e);
+        }
+    } else if (event.data.type === 'addonInstallComplete') {
+        const data = event.data.data || {};
+        if (data.success) {
+            updateInstallProgress(100, '✓ Installation complete');
+            setTimeout(() => updateInstallProgress(-1, ''), 1500);
+        } else {
+            updateInstallProgress(-1, '');
+        }
     }
 });
 
@@ -81,8 +107,10 @@ const optionsState = {
     installPath: '',
     realmAddress: '',
     installedAddons: [],
+    availableUpdates: [],
     wineInfo: null,
-    winePrefixPath: ''
+    winePrefixPath: '',
+    updatingAddons: new Set() // Track which addons are currently updating
 };
 
 // DOM elements
@@ -182,7 +210,7 @@ function setupEventListeners() {
     try {
         // Tab switching
         elements.tabButtons.forEach(button => {
-            button.addEventListener('click', _e => {
+            button.addEventListener('click', () => {
                 switchTab(button.dataset.tab);
             });
         });
@@ -209,14 +237,93 @@ function setupEventListeners() {
 
         // Addons tab events
         if (elements.installAddonBtn) {
-            elements.installAddonBtn.addEventListener('click', installAddonFromGitHub);
+            elements.installAddonBtn.addEventListener('click', openAddonModal);
+        }
+
+        // Paste button for GitHub URL (workaround for iframe clipboard restrictions)
+        const pasteRepoUrlBtn = document.getElementById('paste-repo-url-btn');
+        if (pasteRepoUrlBtn && elements.githubRepoUrl) {
+            pasteRepoUrlBtn.addEventListener('click', async () => {
+                try {
+                    const text = await navigator.clipboard.readText();
+                    elements.githubRepoUrl.value = text;
+                    console.log('Pasted from clipboard:', text);
+                    // Trigger validation
+                    validateRepoUrl(text);
+                } catch (error) {
+                    console.error('Failed to read clipboard:', error);
+                    // Fallback: show instruction
+                    window.alert(
+                        'Please use Ctrl+V (or Cmd+V on Mac) to paste, or try typing the URL manually.'
+                    );
+                }
+            });
         }
 
         if (elements.githubRepoUrl) {
+            // Handle paste event - intercept keyboard shortcut and use Clipboard API
+            elements.githubRepoUrl.addEventListener('keydown', async e => {
+                // Check for Cmd+V (Mac) or Ctrl+V (Windows/Linux)
+                if ((e.metaKey || e.ctrlKey) && e.key === 'v') {
+                    e.preventDefault(); // Prevent default paste behavior
+                    try {
+                        const text = await navigator.clipboard.readText();
+                        elements.githubRepoUrl.value = text;
+                        console.log('Pasted from clipboard via keyboard:', text);
+                        // Trigger input event so any listeners are notified
+                        elements.githubRepoUrl.dispatchEvent(
+                            new window.Event('input', { bubbles: true })
+                        );
+                    } catch (error) {
+                        console.error('Failed to read clipboard:', error);
+                    }
+                }
+            });
+
+            // Handle paste event
+            elements.githubRepoUrl.addEventListener('paste', _e => {
+                console.log('Paste event detected');
+                // Ensure paste works by not preventing default
+                setTimeout(() => {
+                    console.log('Pasted value:', elements.githubRepoUrl.value);
+                }, 10);
+            });
+
+            // Handle input event for any changes
+            elements.githubRepoUrl.addEventListener('input', e => {
+                console.log('Input changed:', e.target.value);
+                validateRepoUrl(e.target.value);
+            });
+
             elements.githubRepoUrl.addEventListener('keypress', e => {
                 if (e.key === 'Enter') {
-                    installAddonFromGitHub();
+                    openAddonModal();
                 }
+            });
+        }
+
+        // Addon search functionality
+        const addonSearchInput = document.getElementById('addon-search');
+        if (addonSearchInput) {
+            // Handle paste keyboard shortcut
+            addonSearchInput.addEventListener('keydown', async e => {
+                if ((e.metaKey || e.ctrlKey) && e.key === 'v') {
+                    e.preventDefault();
+                    try {
+                        const text = await navigator.clipboard.readText();
+                        addonSearchInput.value = text;
+                        // Trigger input event to filter addons
+                        addonSearchInput.dispatchEvent(
+                            new window.Event('input', { bubbles: true })
+                        );
+                    } catch (error) {
+                        console.error('Failed to read clipboard:', error);
+                    }
+                }
+            });
+
+            addonSearchInput.addEventListener('input', e => {
+                filterAddons(e.target.value);
             });
         }
 
@@ -347,64 +454,727 @@ async function testRealmConnection() {
     }
 }
 
-// Install addon from GitHub
-async function installAddonFromGitHub() {
-    const repoUrl = elements.githubRepoUrl?.value;
+// Validate GitHub repository URL
+let validateRepoTimeout = null;
+async function validateRepoUrl(repoUrl) {
+    const validationElement = document.getElementById('repo-validation');
+    const validationText = document.getElementById('repo-validation-text');
 
-    if (!repoUrl) {
-        setButtonState('install-addon-btn', 'error', 'Please enter a GitHub repository URL');
+    // Clear previous timeout
+    if (validateRepoTimeout) {
+        clearTimeout(validateRepoTimeout);
+    }
+
+    // Hide validation if input is empty
+    if (!repoUrl || repoUrl.trim() === '') {
+        if (validationElement) {
+            validationElement.className = 'repo-validation';
+            validationElement.style.display = 'none';
+        }
         return;
     }
 
-    // Get install path
+    // Parse GitHub URL to get owner and repo
+    const urlMatch = repoUrl.match(/github\.com\/([^/]+)\/([^/]+)/);
+    if (!urlMatch) {
+        // Check if it's in "owner/repo" format
+        const simpleMatch = repoUrl.match(/^([^/]+)\/([^/]+)$/);
+        if (!simpleMatch) {
+            if (validationElement && validationText) {
+                validationElement.className = 'repo-validation invalid';
+                validationElement.style.display = 'flex';
+                validationText.textContent =
+                    'Invalid format. Use: github.com/owner/repo or owner/repo';
+            }
+            return;
+        }
+    }
+
+    // Show validating state
+    if (validationElement && validationText) {
+        validationElement.className = 'repo-validation validating';
+        validationElement.style.display = 'flex';
+        validationText.textContent = 'Validating repository...';
+    }
+
+    // Debounce the validation API call
+    validateRepoTimeout = setTimeout(async () => {
+        try {
+            const match = urlMatch || repoUrl.match(/^([^/]+)\/([^/]+)$/);
+            const owner = match[1];
+            const repo = match[2].replace(/\.git$/, '');
+
+            const result = await proxyElectronAPICall('validateAddonRepo', owner, repo);
+
+            if (result.valid) {
+                if (validationElement && validationText) {
+                    validationElement.className = 'repo-validation valid';
+                    validationElement.style.display = 'flex';
+
+                    const addonInfo = result.addonInfo || {};
+                    const folderCount = addonInfo.addonFolders?.length || 0;
+                    const hasRoot = addonInfo.hasTocInRoot ? 1 : 0;
+                    const addonCount = folderCount || hasRoot;
+
+                    if (addonCount > 0) {
+                        const plural = addonCount > 1 ? 's' : '';
+                        validationText.textContent = `✓ Valid addon repo (${addonCount} addon${plural} found)`;
+                    } else {
+                        validationText.textContent = '✓ Valid addon repository';
+                    }
+                }
+            } else {
+                if (validationElement && validationText) {
+                    validationElement.className = 'repo-validation invalid';
+                    validationElement.style.display = 'flex';
+                    validationText.textContent = `✗ ${result.error || 'Not a valid WoW addon repository (no .toc files found)'}`;
+                }
+            }
+        } catch (error) {
+            console.error('Validation error:', error);
+            if (validationElement && validationText) {
+                validationElement.className = 'repo-validation invalid';
+                validationElement.style.display = 'flex';
+                validationText.textContent = `✗ ${error.message || 'Failed to validate repository'}`;
+            }
+        }
+    }, 500); // 500ms debounce
+}
+
+// Update progress bar
+function updateInstallProgress(percent, status) {
+    // Main tab progress
+    const progressContainer = document.getElementById('addon-install-progress');
+    const progressBar = document.getElementById('addon-install-progress-bar');
+    const progressStatus = document.getElementById('addon-install-status');
+
+    if (progressContainer) {
+        progressContainer.style.display = percent >= 0 ? 'block' : 'none';
+    }
+    if (progressBar) {
+        progressBar.style.width = `${percent}%`;
+    }
+    if (progressStatus) {
+        progressStatus.textContent = status;
+    }
+
+    // Modal progress (mirrors main)
+    const modalProgressContainer = document.getElementById('modal-install-progress');
+    const modalProgressBar = document.getElementById('modal-install-progress-bar');
+    const modalProgressStatus = document.getElementById('modal-install-status');
+
+    if (modalProgressContainer) {
+        modalProgressContainer.style.display = percent >= 0 ? 'block' : 'none';
+    }
+    if (modalProgressBar) {
+        modalProgressBar.style.width = `${percent}%`;
+    }
+    if (modalProgressStatus) {
+        modalProgressStatus.textContent = status;
+    }
+}
+
+// Format speeds given bytes/sec or generic units/sec
+function formatSpeed(speed) {
+    if (!speed || isNaN(speed) || speed <= 0) return '';
+    if (speed > 1024) {
+        const kb = speed / 1024;
+        if (kb < 1024) return `${kb.toFixed(1)} KB/s`;
+        const mb = kb / 1024;
+        return `${mb.toFixed(1)} MB/s`;
+    }
+    return `${Math.round(speed)} u/s`;
+}
+
+// Attach real-time progress events
+function attachAddonInstallProgressEvents() {
+    try {
+        if (window.electronAPI && window.electronAPI.onAddonInstallProgress) {
+            window.electronAPI.onAddonInstallProgress((_event, data) => {
+                const percent =
+                    data.percent !== null && data.percent !== undefined
+                        ? Math.max(0, Math.min(100, Math.floor(data.percent)))
+                        : null;
+                const speedText = formatSpeed(data.speed);
+                const baseStatus = data.status || 'Installing';
+                const pctStatus = percent !== null ? ` — ${percent}%` : '';
+                const spdStatus = speedText ? ` @ ${speedText}` : '';
+                updateInstallProgress(
+                    percent !== null ? percent : 0,
+                    `${baseStatus}${pctStatus}${spdStatus}`
+                );
+            });
+        }
+        if (window.electronAPI && window.electronAPI.onAddonInstallComplete) {
+            window.electronAPI.onAddonInstallComplete((_event, data) => {
+                if (data && data.success) {
+                    updateInstallProgress(100, '✓ Installation complete');
+                    setTimeout(() => updateInstallProgress(-1, ''), 1500);
+                } else if (data && data.error) {
+                    updateInstallProgress(-1, '');
+                }
+            });
+        }
+    } catch (e) {
+        console.warn('Could not attach addon install progress listeners:', e);
+    }
+}
+
+// installAddonFromGitHub - functionality moved to modal-based flow (installAddonFromModal)
+
+// Modal state
+const modalState = {
+    currentAddon: null,
+    owner: null,
+    repo: null,
+    branches: [],
+    selectedBranch: null,
+    isInstalled: false,
+    installedAddonName: null
+};
+
+// Open addon modal (either for new install or existing addon)
+async function openAddonModal() {
+    const repoUrl = elements.githubRepoUrl?.value;
+
+    if (!repoUrl) {
+        showToast('Please enter a GitHub repository URL', 'error');
+        return;
+    }
+
+    // Parse GitHub URL to get owner and repo
+    const urlMatch = repoUrl.match(/github\.com\/([^/]+)\/([^/]+)/);
+    const simpleMatch = repoUrl.match(/^([^/]+)\/([^/]+)$/);
+
+    let owner, repo;
+    if (urlMatch) {
+        [, owner, repo] = urlMatch;
+    } else if (simpleMatch) {
+        [, owner, repo] = simpleMatch;
+    } else {
+        showToast('Invalid GitHub repository URL', 'error');
+        return;
+    }
+
+    const cleanRepo = repo.replace(/\.git$/, '');
+
+    await showAddonDetailsModal(owner, cleanRepo);
+}
+
+// Open modal for installed addon
+async function openInstalledAddonModal(folderName, githubRepo) {
+    if (!githubRepo) {
+        showToast('No GitHub repository information available for this addon', 'error');
+        return;
+    }
+
+    const [owner, repo] = githubRepo.split('/');
+    modalState.isInstalled = true;
+    modalState.installedAddonName = folderName; // Store folder name for uninstall
+
+    await showAddonDetailsModal(owner, repo);
+}
+
+// Show addon details modal
+async function showAddonDetailsModal(owner, repo) {
+    const modal = document.getElementById('repo-info-modal');
+    if (!modal) return;
+
+    modalState.owner = owner;
+    modalState.repo = repo;
+
+    // Show modal
+    modal.classList.add('active');
+
+    // Update modal title
+    const modalTitle = document.getElementById('modal-repo-title');
+    if (modalTitle) {
+        modalTitle.textContent = modalState.isInstalled
+            ? `Addon Settings: ${modalState.installedAddonName}`
+            : `Install: ${owner}/${repo}`;
+    }
+
+    // Show/hide appropriate buttons
+    const installBtn = document.getElementById('modal-install-btn');
+    const uninstallBtn = document.getElementById('modal-uninstall-btn');
+
+    if (installBtn) {
+        installBtn.style.display = modalState.isInstalled ? 'none' : 'block';
+        installBtn.onclick = () => installAddonFromModal();
+    }
+
+    if (uninstallBtn) {
+        // Individual addon modal - hide uninstall button (use group modal for deletion)
+        uninstallBtn.style.display = 'none';
+    }
+
+    // Load addon details
+    await loadAddonDetails(owner, repo);
+}
+
+// Load addon details from GitHub
+async function loadAddonDetails(owner, repo) {
+    try {
+        // Fetch repository information
+        const repoInfo = await proxyElectronAPICall('fetchGitHubRepoInfo', owner, repo);
+
+        // Update modal info tab
+        const descEl = document.getElementById('modal-description');
+        const starsEl = document.getElementById('modal-stars');
+        const updatedEl = document.getElementById('modal-updated');
+        const branchEl = document.getElementById('modal-default-branch');
+
+        if (descEl) descEl.textContent = repoInfo.description || 'No description';
+        if (starsEl) starsEl.textContent = repoInfo.stars || '0';
+        if (updatedEl) updatedEl.textContent = new Date(repoInfo.updatedAt).toLocaleDateString();
+        if (branchEl) branchEl.textContent = repoInfo.defaultBranch;
+
+        // Fetch branches
+        const branches = await proxyElectronAPICall('fetchGitHubBranches', owner, repo);
+
+        if (branches && branches.length > 0) {
+            modalState.branches = branches;
+            const branchSelector = document.getElementById('branch-selector');
+            const branchContainer = document.getElementById('branch-selector-container');
+
+            if (branchSelector && branchContainer) {
+                branchSelector.innerHTML = branches
+                    .map(branch => `<option value="${branch.name}">${branch.name}</option>`)
+                    .join('');
+
+                // Select default branch
+                branchSelector.value = repoInfo.defaultBranch;
+                modalState.selectedBranch = repoInfo.defaultBranch;
+
+                // When dropdown changes, automatically switch branch
+                branchSelector.onchange = async e => {
+                    const selectedBranch = e.target.value;
+                    await installAddonFromModal(selectedBranch);
+                };
+
+                // Show branch selector if multiple branches
+                if (branches.length > 1) {
+                    branchContainer.style.display = 'flex';
+                } else {
+                    branchContainer.style.display = 'none';
+                }
+            }
+        }
+
+        // Fetch README
+        const readme = await proxyElectronAPICall('fetchGitHubReadme', owner, repo);
+        const readmeContent = document.getElementById('modal-readme-content');
+
+        if (readmeContent) {
+            if (readme) {
+                // Simple markdown rendering (basic)
+                readmeContent.innerHTML = readme
+                    .replace(/### (.+)/g, '<h3>$1</h3>')
+                    .replace(/## (.+)/g, '<h2>$1</h2>')
+                    .replace(/# (.+)/g, '<h1>$1</h1>')
+                    .replace(/`([^`]+)`/g, '<code>$1</code>')
+                    .replace(/\n\n/g, '</p><p>')
+                    .replace(/^(.)/g, '<p>$1');
+            } else {
+                readmeContent.textContent = 'No README available';
+            }
+        }
+    } catch (error) {
+        console.error('Error loading addon details:', error);
+
+        // Show error in modal
+        const readmeContent = document.getElementById('modal-readme-content');
+        if (readmeContent) {
+            readmeContent.innerHTML = `
+                <div style='padding: 20px; text-align: center; color: #ff6b6b;'>
+                    <h3>Error Loading Repository</h3>
+                    <p>${error.message || 'Unknown error occurred'}</p>
+                    <p style="font-size: 0.9em; color: #aaa;">The repository may not exist or may be private.</p>
+                </div>
+            `;
+        }
+
+        showToast('Failed to load addon details: ' + error.message, 'error');
+    }
+}
+
+// Install addon from modal
+async function installAddonFromModal(branchFromDropdown = null) {
+    const installBtn = document.getElementById('modal-install-btn');
+    if (!installBtn) return;
+
     const installPath = optionsState.settings.installPath || optionsState.config?.installPath;
     if (!installPath) {
-        setButtonState('install-addon-btn', 'error', 'Please set your WoW installation path first');
+        showToast('Please set your WoW installation path first', 'error');
         return;
     }
 
     try {
-        setButtonLoading('install-addon-btn', true);
+        // Determine which branch to use
+        const branchToUse = branchFromDropdown || modalState.selectedBranch;
 
-        // Parse GitHub URL to get owner and repo
-        const urlMatch = repoUrl.match(/github\.com\/([^/]+)\/([^/]+)/);
-        if (!urlMatch) {
-            setButtonState('install-addon-btn', 'error', 'Invalid GitHub repository URL');
-            return;
-        }
+        // Hide button and show status while switching/installing
+        installBtn.disabled = true;
+        installBtn.textContent = 'Processing...';
 
-        const [, owner, repo] = urlMatch;
-        const cleanRepo = repo.replace(/\.git$/, '');
-
-        console.log(`Installing addon from ${owner}/${cleanRepo}`);
+        // Show progress inside modal and attach real-time updates
+        attachAddonInstallProgressEvents();
+        updateInstallProgress(0, branchFromDropdown ? 'Switching branch...' : 'Preparing...');
 
         const result = await proxyElectronAPICall(
             'installAddonFromGitHub',
-            owner,
-            cleanRepo,
-            installPath
+            modalState.owner,
+            modalState.repo,
+            installPath,
+            branchToUse
         );
 
+        // main process also emits completion event
+
         if (result.success) {
-            setButtonState('install-addon-btn', 'success', 'Addon installed successfully!');
+            updateInstallProgress(
+                100,
+                branchFromDropdown ? '✓ Branch switched!' : '✓ Installation complete!'
+            );
+            showToast(
+                branchFromDropdown
+                    ? 'Branch switched successfully!'
+                    : 'Addon installed successfully!',
+                'success'
+            );
             elements.githubRepoUrl.value = '';
-            // Reload addon list
             await loadInstalledAddons();
+            // Let user see the complete status briefly before closing
+            setTimeout(() => {
+                updateInstallProgress(-1, '');
+                closeAddonModal();
+            }, 1200);
         } else {
-            setButtonState(
-                'install-addon-btn',
-                'error',
-                `Failed to install: ${result.error || 'Unknown error'}`
+            updateInstallProgress(-1, '');
+            showToast(
+                `Failed to ${branchFromDropdown ? 'switch branch' : 'install'}: ${result.error || 'Unknown error'}`,
+                'error'
             );
         }
     } catch (error) {
         console.error('Error installing addon:', error);
-        setButtonState(
-            'install-addon-btn',
-            'error',
-            'Installation failed: ' + (error.message || error)
+        updateInstallProgress(-1, '');
+        showToast('Installation failed: ' + (error.message || error), 'error');
+    } finally {
+        installBtn.disabled = false;
+        installBtn.textContent = modalState.isInstalled ? 'Switch Branch' : 'Install';
+    }
+}
+
+// Uninstall addon from modal (exported to window below)
+async function uninstallAddonFromModal() {
+    if (!modalState.installedAddonName) return;
+
+    const installPath = optionsState.settings.installPath || optionsState.config?.installPath;
+    if (!installPath) {
+        showToast('Install path not available', 'error');
+        return;
+    }
+
+    try {
+        showToast(`Uninstalling ${modalState.installedAddonName}...`, 'info');
+        await proxyElectronAPICall('uninstallAddon', modalState.installedAddonName, installPath);
+        showToast(`${modalState.installedAddonName} has been uninstalled successfully`, 'success');
+        await loadInstalledAddons();
+        closeAddonModal();
+    } catch (error) {
+        console.error('Failed to uninstall addon:', error);
+        showToast(
+            `Failed to uninstall ${modalState.installedAddonName}: ${error.message || 'Unknown error'}`,
+            'error'
         );
     }
+}
+
+// Open repo group modal for managing all addons from a repository
+async function openRepoGroupModal(githubRepo, addonCount) {
+    const [owner, repo] = githubRepo.split('/');
+
+    // Create a custom modal for group operations
+    const existingModal = document.getElementById('repo-group-modal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+
+    const modal = document.createElement('div');
+    modal.id = 'repo-group-modal';
+    modal.className = 'modal-overlay active';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🔗 ${repo}</h2>
+                <button class="modal-close" onclick="closeRepoGroupModal()">×</button>
+            </div>
+            <div class="modal-tabs">
+                <button class="tab-button active" onclick="switchRepoGroupTab('readme')">README</button>
+                <button class="tab-button" onclick="switchRepoGroupTab('info')">Manage</button>
+            </div>
+            <div class="modal-body">
+                <div id="group-tab-readme" class="tab-content active">
+                    <div id="group-modal-readme-content" class="readme-content">Loading README...</div>
+                </div>
+                <div id="group-tab-info" class="tab-content">
+                    <p style="margin-bottom: 20px;">
+                        This repository contains <strong>${addonCount}</strong> addon module${addonCount > 1 ? 's' : ''}.
+                    </p>
+                    
+                    <div class="option-item">
+                        <label for="group-branch-selector">Switch Branch:</label>
+                        <select id="group-branch-selector" style="width: 100%; padding: 8px; margin-top: 8px;">
+                            <option value="">Loading branches...</option>
+                        </select>
+                        <div class="option-description">
+                            Switch all modules from this repository to a different branch
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 30px; display: flex; gap: 10px; flex-direction: column;">
+                        <button id="group-switch-branch-btn" class="btn btn-primary" disabled>
+                            <span class="btn-text">Switch Branch</span>
+                        </button>
+                        <button id="group-uninstall-btn" class="btn btn-danger">
+                            <span class="btn-text">Uninstall All Modules</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Add click handler to close modal when clicking overlay background (but not content)
+    modal.addEventListener('click', e => {
+        if (e.target === modal) {
+            closeRepoGroupModal();
+        }
+    });
+
+    // Fetch branches
+    try {
+        const branches = await proxyElectronAPICall('fetchGitHubBranches', owner, repo);
+        const branchSelector = document.getElementById('group-branch-selector');
+        const switchBtn = document.getElementById('group-switch-branch-btn');
+
+        if (branches && branches.length > 0) {
+            branchSelector.innerHTML = branches
+                .map(branch => `<option value="${branch.name}">${branch.name}</option>`)
+                .join('');
+
+            if (switchBtn) switchBtn.disabled = false;
+
+            switchBtn.onclick = async () => {
+                const selectedBranch = branchSelector.value;
+                await switchRepoGroupBranch(githubRepo, selectedBranch);
+            };
+        }
+    } catch (error) {
+        console.error('Failed to load branches:', error);
+    }
+
+    // Fetch README
+    try {
+        const readme = await proxyElectronAPICall('fetchGitHubReadme', owner, repo);
+        const readmeContent = document.getElementById('group-modal-readme-content');
+
+        if (readmeContent) {
+            if (readme) {
+                readmeContent.innerHTML = readme
+                    .replace(/### (.+)/g, '<h3>$1</h3>')
+                    .replace(/## (.+)/g, '<h2>$1</h2>')
+                    .replace(/# (.+)/g, '<h1>$1</h1>')
+                    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+                    .replace(/`(.+?)`/g, '<code>$1</code>')
+                    .replace(/\n/g, '<br>');
+            } else {
+                readmeContent.innerHTML = '<p style="color: #999;">No README available</p>';
+            }
+        }
+    } catch (error) {
+        console.error('Failed to load README:', error);
+        const readmeContent = document.getElementById('group-modal-readme-content');
+        if (readmeContent) {
+            readmeContent.innerHTML = '<p style="color: #f44336;">Failed to load README</p>';
+        }
+    }
+
+    // Setup uninstall button
+    const uninstallBtn = document.getElementById('group-uninstall-btn');
+    if (uninstallBtn) {
+        uninstallBtn.onclick = async e => {
+            e.stopPropagation();
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            await uninstallRepoGroup(githubRepo, addonCount);
+        };
+    }
+}
+
+function switchRepoGroupTab(tabName) {
+    const tabs = document.querySelectorAll('#repo-group-modal .tab-button');
+    const contents = document.querySelectorAll('#repo-group-modal .tab-content');
+
+    tabs.forEach(tab => tab.classList.remove('active'));
+    contents.forEach(content => content.classList.remove('active'));
+
+    const activeTab = Array.from(tabs).find(
+        t => t.textContent === (tabName === 'info' ? 'Info' : 'README')
+    );
+    const activeContent = document.getElementById(`group-tab-${tabName}`);
+
+    if (activeTab) activeTab.classList.add('active');
+    if (activeContent) activeContent.classList.add('active');
+}
+
+function closeRepoGroupModal() {
+    const modal = document.getElementById('repo-group-modal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+async function switchRepoGroupBranch(githubRepo, branch) {
+    const installPath = optionsState.settings.installPath || optionsState.config?.installPath;
+    if (!installPath) {
+        window.alert('Install path not available');
+        return;
+    }
+
+    if (
+        !window.confirm(
+            `Switch all modules from ${githubRepo} to branch "${branch}"?\n\nThis will reinstall all modules from this repository.`
+        )
+    ) {
+        return;
+    }
+
+    const switchBtn = document.getElementById('group-switch-branch-btn');
+    if (switchBtn) {
+        switchBtn.disabled = true;
+        switchBtn.querySelector('.btn-text').textContent = 'Switching...';
+    }
+
+    try {
+        // First, get all addons from this repo
+        const addons = optionsState.installedAddons.filter(a => a.githubRepo === githubRepo);
+
+        // Uninstall all modules
+        for (const addon of addons) {
+            await proxyElectronAPICall('uninstallAddon', addon.name, installPath);
+        }
+
+        // Reinstall from the new branch
+        const [owner, repo] = githubRepo.split('/');
+        await proxyElectronAPICall('installAddonFromGitHub', owner, repo, installPath, branch);
+
+        window.alert(`Successfully switched ${addons.length} module(s) to branch "${branch}"`);
+        await loadInstalledAddons();
+        closeRepoGroupModal();
+    } catch (error) {
+        console.error('Failed to switch branch:', error);
+        window.alert(`Failed to switch branch: ${error.message || 'Unknown error'}`);
+    } finally {
+        if (switchBtn) {
+            switchBtn.disabled = false;
+            switchBtn.querySelector('.btn-text').textContent = 'Switch Branch';
+        }
+    }
+}
+
+async function uninstallRepoGroup(githubRepo, addonCount) {
+    const installPath = optionsState.settings.installPath || optionsState.config?.installPath;
+    if (!installPath) {
+        showToast('Install path not available', 'error');
+        return;
+    }
+
+    const uninstallBtn = document.getElementById('group-uninstall-btn');
+    if (uninstallBtn) {
+        uninstallBtn.disabled = true;
+        uninstallBtn.querySelector('.btn-text').textContent = 'Uninstalling...';
+    }
+
+    try {
+        showToast(`Uninstalling ${addonCount} module(s)...`, 'info');
+
+        // Get all addons from this repo
+        const addons = optionsState.installedAddons.filter(a => a.githubRepo === githubRepo);
+
+        // Uninstall each addon using the actual folder name
+        for (const addon of addons) {
+            await proxyElectronAPICall('uninstallAddon', addon.folderName, installPath);
+        }
+
+        showToast(`Successfully uninstalled ${addonCount} module(s)`, 'success');
+        await loadInstalledAddons();
+        closeRepoGroupModal();
+    } catch (error) {
+        console.error('Failed to uninstall group:', error);
+        showToast(`Failed to uninstall: ${error.message || 'Unknown error'}`, 'error');
+    } finally {
+        if (uninstallBtn) {
+            uninstallBtn.disabled = false;
+            uninstallBtn.querySelector('.btn-text').textContent = 'Uninstall All Modules';
+        }
+    }
+}
+
+// Close addon modal
+function closeAddonModal() {
+    const modal = document.getElementById('repo-info-modal');
+    if (modal) {
+        modal.classList.remove('active');
+    }
+
+    // Reset modal state
+    modalState.currentAddon = null;
+    modalState.owner = null;
+    modalState.repo = null;
+    modalState.branches = [];
+    modalState.selectedBranch = null;
+    modalState.isInstalled = false;
+    modalState.installedAddonName = null;
+
+    // Hide branch selector
+    const branchContainer = document.getElementById('branch-selector-container');
+    if (branchContainer) {
+        branchContainer.style.display = 'none';
+    }
+}
+
+// Filter addons based on search
+function filterAddons(searchTerm) {
+    const addonItems = document.querySelectorAll('.addon-item:not(.addon-group-header)');
+    const searchLower = searchTerm.toLowerCase();
+
+    addonItems.forEach(item => {
+        const nameEl = item.querySelector('.addon-name');
+        const descEl = item.querySelector('.addon-description');
+
+        if (nameEl) {
+            const name = nameEl.textContent.toLowerCase();
+            const desc = descEl ? descEl.textContent.toLowerCase() : '';
+            const matches = name.includes(searchLower) || desc.includes(searchLower);
+
+            item.classList.toggle('hidden', !matches);
+        }
+    });
+
+    // Handle group visibility
+    const groupHeaders = document.querySelectorAll('.addon-group-header');
+    groupHeaders.forEach(header => {
+        const groupItems = header.nextElementSibling;
+        if (groupItems && groupItems.classList.contains('addon-group-items')) {
+            const visibleItems = groupItems.querySelectorAll('.addon-item:not(.hidden)');
+            header.classList.toggle('hidden', visibleItems.length === 0);
+        }
+    });
 }
 
 // Save options
@@ -453,7 +1223,7 @@ function resetToDefaults() {
     if (elements.enableLogging) elements.enableLogging.checked = false;
     if (elements.addonBackup) elements.addonBackup.checked = true;
 
-    setButtonState('reset-options', 'success', 'Settings reset to defaults');
+    setButtonState('reset-options', 'success', 'Done!');
 }
 
 // Populate form with current settings
@@ -589,11 +1359,11 @@ async function proxyElectronAPICall(method, ...args) {
                 '*'
             );
 
-            // Timeout after 10 seconds
+            // Timeout after 20 seconds for installations
             setTimeout(() => {
                 window.removeEventListener('message', messageHandler);
                 reject(new Error('ElectronAPI call timeout'));
-            }, 10000);
+            }, 20000);
         } else {
             // Direct call if not in iframe
             if (window.electronAPI && window.electronAPI[method]) {
@@ -667,10 +1437,75 @@ function updateConnectionStatus(type, message) {
     elements.connectionStatus.textContent = message;
 }
 
-// Show status message
-function showStatusMessage(message, type = 'info') {
-    console.log(`${type.toUpperCase()}: ${message}`);
-    // You can implement a toast notification system here
+// Group addons by GitHub repository
+function groupAddonsByRepo(addons) {
+    const repoGroups = {};
+    const prefixGroups = {};
+    const standalone = [];
+    const blizzardAddons = [];
+    const processedAddons = new Set();
+
+    console.log('Starting addon grouping with', addons.length, 'addons');
+
+    // First, separate Blizzard addons
+    addons.forEach(addon => {
+        if (addon.name.startsWith('Blizzard_')) {
+            blizzardAddons.push(addon);
+            processedAddons.add(addon.name);
+        }
+    });
+
+    // Then, group by GitHub repo (highest priority)
+    addons.forEach(addon => {
+        if (processedAddons.has(addon.name)) return;
+
+        if (addon.githubRepo) {
+            console.log(`Grouping ${addon.name} by repo: ${addon.githubRepo}`);
+            if (!repoGroups[addon.githubRepo]) {
+                repoGroups[addon.githubRepo] = [];
+            }
+            repoGroups[addon.githubRepo].push(addon);
+            processedAddons.add(addon.name);
+        }
+    });
+
+    // Then group remaining addons by prefix
+    addons.forEach(addon => {
+        if (processedAddons.has(addon.name)) return;
+
+        const nameParts = addon.name.split('_');
+        if (nameParts.length > 1) {
+            const prefix = nameParts[0];
+
+            // See if there are other addons with this prefix
+            const related = addons.filter(
+                a => !processedAddons.has(a.name) && a.name.startsWith(prefix + '_')
+            );
+
+            if (related.length > 1) {
+                if (!prefixGroups[prefix]) {
+                    prefixGroups[prefix] = [];
+                }
+                prefixGroups[prefix].push(addon);
+                processedAddons.add(addon.name);
+                return;
+            }
+        }
+
+        standalone.push(addon);
+    });
+
+    return { repoGroups, prefixGroups, standalone, blizzardAddons };
+}
+
+// Render a settings icon SVG
+function getSettingsIconSVG() {
+    return `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+    `;
 }
 
 // Load and display installed addons
@@ -698,6 +1533,10 @@ async function loadInstalledAddons() {
 
         const addons = await proxyElectronAPICall('getInstalledAddons', installPath);
         console.log('Loaded addons:', addons);
+        console.log(
+            'Addons with GitHub repos:',
+            addons.filter(a => a.githubRepo).map(a => ({ name: a.name, repo: a.githubRepo }))
+        );
 
         const addonList = document.getElementById('addon-list');
         if (!addonList) {
@@ -717,24 +1556,98 @@ async function loadInstalledAddons() {
             return;
         }
 
-        // Display installed addons
-        addonList.innerHTML = addons
-            .map(
-                addon => `
-            <div class="addon-item">
-                <div class="addon-info">
-                    <div class="addon-name">${addon.name || 'Unknown Addon'}</div>
-                    <div class="addon-description">${addon.description || 'No description available'}</div>
-                    <div class="addon-version">Version: ${addon.version || 'Unknown'}</div>
+        // Group addons by repo, then prefix
+        const { repoGroups, prefixGroups, standalone, blizzardAddons } = groupAddonsByRepo(addons);
+
+        console.log('Grouping results:', {
+            repoGroups: Object.keys(repoGroups).map(k => ({
+                repo: k,
+                count: repoGroups[k].length
+            })),
+            prefixGroups: Object.keys(prefixGroups).map(k => ({
+                prefix: k,
+                count: prefixGroups[k].length
+            })),
+            standalone: standalone.length,
+            blizzardAddons: blizzardAddons.length
+        });
+
+        let html = '';
+
+        // Render repo groups (highest priority)
+        Object.keys(repoGroups).forEach(repoKey => {
+            const groupAddons = repoGroups[repoKey];
+            const repoName = repoKey.split('/')[1] || repoKey; // Extract repo name from "owner/repo"
+            const groupId = repoKey.replace(/[^a-zA-Z0-9]/g, '-'); // Safe ID for HTML
+
+            html += `
+                <div class="addon-group-header">
+                    <div class="addon-group-title" onclick="toggleAddonGroup('${groupId}')">
+                        <span>🔗 ${repoName}</span>
+                        <span class="addon-group-count">${groupAddons.length} modules</span>
+                        <span class="addon-group-toggle">▼</span>
+                    </div>
+                    <button class="addon-settings-btn" onclick="event.stopPropagation(); openRepoGroupModal('${repoKey.replace(/'/g, "\\'")}', ${groupAddons.length})" title="Repository settings">
+                        ${getSettingsIconSVG()}
+                    </button>
                 </div>
-                <div class="addon-actions">
-                    <div class="addon-status installed">Installed</div>
-                    <button class="btn btn-danger btn-sm" onclick="uninstallAddon('${addon.name}')"><span class="btn-text">Remove</span></button>
+                <div class="addon-group-items" id="group-${groupId}">
+            `;
+
+            groupAddons.forEach(addon => {
+                html += renderAddonItem(addon);
+            });
+
+            html += '</div>';
+        });
+
+        // Render prefix groups (fallback)
+        Object.keys(prefixGroups).forEach(prefix => {
+            const groupAddons = prefixGroups[prefix];
+            html += `
+                <div class="addon-group-header" onclick="toggleAddonGroup('${prefix}')">
+                    <div class="addon-group-title">
+                        <span>📦 ${prefix}</span>
+                        <span class="addon-group-count">${groupAddons.length} modules</span>
+                    </div>
+                    <span class="addon-group-toggle">▼</span>
                 </div>
-            </div>
-        `
-            )
-            .join('');
+                <div class="addon-group-items" id="group-${prefix}">
+            `;
+
+            groupAddons.forEach(addon => {
+                html += renderAddonItem(addon);
+            });
+
+            html += '</div>';
+        });
+
+        // Render standalone addons
+        standalone.forEach(addon => {
+            html += renderAddonItem(addon);
+        });
+
+        // Render Blizzard addons at the bottom (collapsed by default)
+        if (blizzardAddons.length > 0) {
+            html += `
+                <div class="addon-group-header" onclick="toggleAddonGroup('blizzard')">
+                    <div class="addon-group-title">
+                        <span>⚙️ Blizzard UI</span>
+                        <span class="addon-group-count">${blizzardAddons.length} modules</span>
+                    </div>
+                    <span class="addon-group-toggle">▶</span>
+                </div>
+                <div class="addon-group-items" id="group-blizzard" style="display: none;">
+            `;
+
+            blizzardAddons.forEach(addon => {
+                html += renderAddonItem(addon);
+            });
+
+            html += '</div>';
+        }
+
+        addonList.innerHTML = html;
 
         // Store loaded addons in state
         optionsState.installedAddons = addons;
@@ -753,6 +1666,96 @@ async function loadInstalledAddons() {
         }
     }
 }
+
+// Render a single addon item
+function renderAddonItem(addon) {
+    // Debug log
+    if (addon.githubRepo) {
+        console.log('Addon with GitHub repo:', addon.name, addon.githubRepo);
+    }
+
+    // Check if this addon has an update available
+    const updates = optionsState.availableUpdates || [];
+    const hasUpdate = updates.some(u => u.addonName === addon.name);
+    const updateInfo = hasUpdate ? updates.find(u => u.addonName === addon.name) : null;
+    const isUpdating = optionsState.updatingAddons.has(addon.name);
+
+    const safeFolderKey = (addon.folderName || addon.name || '').replace(/'/g, "\\'");
+    const settingsButton = addon.githubRepo
+        ? `
+        <button class="addon-settings-btn" onclick="openInstalledAddonModal('${safeFolderKey}', '${addon.githubRepo}')" title="Addon settings">
+            ${getSettingsIconSVG()}
+        </button>
+    `
+        : '';
+
+    const updateButton =
+        hasUpdate && !isUpdating
+            ? `
+        <button class="addon-update-btn" onclick="updateSingleAddon('${addon.name.replace(/'/g, "\\'")}')" title="Update available: ${updateInfo.currentCommit} → ${updateInfo.latestCommit}">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+            </svg>
+            Update
+        </button>
+    `
+            : '';
+
+    const progressBar = isUpdating
+        ? `
+        <div class="addon-progress-bar">
+            <div class="addon-progress-fill"></div>
+        </div>
+    `
+        : '';
+
+    // Version status badge - green if up to date, red with download icon if update available
+    const versionBadge = addon.version
+        ? `
+        <div class="addon-status ${hasUpdate ? 'update-available' : 'installed'}" title="${hasUpdate ? 'Update available' : 'Up to date'}">
+            ${hasUpdate ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>' : ''}
+            v${addon.version}
+        </div>
+    `
+        : '<div class="addon-status installed">Installed</div>';
+
+    return `
+        <div class="addon-item ${hasUpdate ? 'has-update' : ''} ${isUpdating ? 'updating' : ''}" data-addon-name="${addon.name}">
+            ${progressBar}
+            <div class="addon-info">
+                <div class="addon-name">
+                    ${addon.name || 'Unknown Addon'}
+                    ${hasUpdate ? '<span class="update-badge">!</span>' : ''}
+                    ${isUpdating ? '<span class="updating-text">Updating...</span>' : ''}
+                </div>
+                <div class="addon-description">${addon.description || 'No description available'}</div>
+                ${hasUpdate && !isUpdating ? `<div class="addon-update-info" style="font-size: 0.75em; color: #4caf50; margin-top: 4px;">Update available: ${updateInfo.currentCommit} → ${updateInfo.latestCommit}</div>` : ''}
+            </div>
+            <div class="addon-actions">
+                ${updateButton}
+                ${versionBadge}
+                ${settingsButton}
+            </div>
+        </div>
+    `;
+}
+
+// Toggle addon group visibility (exported to window below)
+function toggleAddonGroup(prefix, event) {
+    const groupItems = document.getElementById(`group-${prefix}`);
+    const groupHeader = event.currentTarget;
+    const toggleIcon = groupHeader.querySelector('.addon-group-toggle');
+
+    if (groupItems) {
+        groupItems.classList.toggle('collapsed');
+        if (toggleIcon) {
+            toggleIcon.textContent = groupItems.classList.contains('collapsed') ? '▶' : '▼';
+        }
+    }
+}
+
+// Show status message
 
 // Uninstall addon function
 async function uninstallAddon(addonName) {
@@ -810,7 +1813,7 @@ async function uninstallAddon(addonName) {
 // Check for addon updates
 // eslint-disable-next-line no-unused-vars
 async function checkForUpdates() {
-    const updateBtn = document.querySelector('button[onclick="checkForUpdates()"]');
+    const updateBtn = document.getElementById('check-updates-btn');
 
     try {
         if (updateBtn) {
@@ -818,50 +1821,163 @@ async function checkForUpdates() {
             updateBtn.disabled = true;
         }
 
-        // Get installed addons first
+        // Get install path
         const installPath = optionsState.settings.installPath || optionsState.config?.installPath;
         if (!installPath) {
             if (updateBtn) {
                 updateBtn.classList.remove('btn-loading');
                 updateBtn.disabled = false;
-                showStatusMessage(updateBtn, 'Install path not available', 'error');
             }
+            console.error('Install path not available');
             return;
         }
 
-        const addons = optionsState.installedAddons || [];
-        if (addons.length === 0) {
-            if (updateBtn) {
-                updateBtn.classList.remove('btn-loading');
-                updateBtn.disabled = false;
-                showStatusMessage(updateBtn, 'No addons installed to check', 'error');
-            }
-            return;
-        }
+        console.log('Checking for addon updates...');
+        const updates = await proxyElectronAPICall('checkAddonUpdates', installPath);
 
-        const result = await proxyElectronAPICall('checkAddonUpdates', addons);
+        console.log('Updates found:', updates);
+
+        // Store updates in state
+        optionsState.availableUpdates = updates;
 
         if (updateBtn) {
             updateBtn.classList.remove('btn-loading');
             updateBtn.disabled = false;
+        }
 
-            if (result && result.length > 0) {
-                showStatusMessage(
-                    updateBtn,
-                    `Found ${result.length} update(s) available!`,
-                    'success'
-                );
-            } else {
-                showStatusMessage(updateBtn, 'All addons are up to date!', 'success');
+        // Show/hide Update All button
+        const updateAllBtn = document.getElementById('update-all-btn');
+        if (updateAllBtn) {
+            updateAllBtn.style.display = updates.length > 0 ? 'inline-block' : 'none';
+            if (updates.length > 0) {
+                updateAllBtn.querySelector('.btn-text').textContent =
+                    `Update All (${updates.length})`;
             }
+        }
+
+        // Re-render addon list with update icons
+        await loadInstalledAddons();
+
+        if (updates.length > 0) {
+            console.log(`Found ${updates.length} update(s) available!`);
+        } else {
+            console.log('All addons are up to date!');
         }
     } catch (error) {
         console.error('Failed to check for updates:', error);
         if (updateBtn) {
             updateBtn.classList.remove('btn-loading');
             updateBtn.disabled = false;
-            showStatusMessage(updateBtn, 'Failed to check for updates', 'error');
         }
+    }
+}
+
+async function updateAllAddons() {
+    const updateAllBtn = document.getElementById('update-all-btn');
+
+    try {
+        if (updateAllBtn) {
+            updateAllBtn.classList.add('btn-loading');
+            updateAllBtn.disabled = true;
+        }
+
+        const updates = optionsState.availableUpdates || [];
+        if (updates.length === 0) {
+            console.log('No updates available');
+            return;
+        }
+
+        const installPath = optionsState.settings.installPath || optionsState.config?.installPath;
+        if (!installPath) {
+            console.error('Install path not available');
+            return;
+        }
+
+        console.log(`Updating ${updates.length} addon(s)...`);
+
+        // Add all addons to updating set and render
+        for (const update of updates) {
+            optionsState.updatingAddons.add(update.addonName);
+        }
+        await loadInstalledAddons();
+
+        // Update each addon
+        for (const update of updates) {
+            try {
+                console.log(`Updating ${update.addonName}...`);
+                await proxyElectronAPICall('updateAddon', update.addonName, installPath);
+                console.log(`✓ Updated ${update.addonName}`);
+
+                // Remove from updating set and re-render
+                optionsState.updatingAddons.delete(update.addonName);
+                await loadInstalledAddons();
+            } catch (error) {
+                console.error(`Failed to update ${update.addonName}:`, error);
+                optionsState.updatingAddons.delete(update.addonName);
+            }
+        }
+
+        // Clear updates and reload
+        optionsState.availableUpdates = [];
+        if (updateAllBtn) {
+            updateAllBtn.style.display = 'none';
+            updateAllBtn.classList.remove('btn-loading');
+            updateAllBtn.disabled = false;
+        }
+
+        await loadInstalledAddons();
+        console.log('All updates complete!');
+    } catch (error) {
+        console.error('Failed to update addons:', error);
+        if (updateAllBtn) {
+            updateAllBtn.classList.remove('btn-loading');
+            updateAllBtn.disabled = false;
+        }
+    }
+}
+
+async function updateSingleAddon(addonName) {
+    try {
+        const installPath = optionsState.settings.installPath || optionsState.config?.installPath;
+        if (!installPath) {
+            console.error('Install path not available');
+            return;
+        }
+
+        // Mark as updating
+        optionsState.updatingAddons.add(addonName);
+        await loadInstalledAddons();
+
+        console.log(`Updating ${addonName}...`);
+        await proxyElectronAPICall('updateAddon', addonName, installPath);
+        console.log(`✓ Updated ${addonName}`);
+
+        // Remove from updating and available updates
+        optionsState.updatingAddons.delete(addonName);
+        if (optionsState.availableUpdates) {
+            optionsState.availableUpdates = optionsState.availableUpdates.filter(
+                u => u.addonName !== addonName
+            );
+
+            // Update the "Update All" button
+            const updateAllBtn = document.getElementById('update-all-btn');
+            if (updateAllBtn) {
+                const remaining = optionsState.availableUpdates.length;
+                if (remaining > 0) {
+                    updateAllBtn.querySelector('.btn-text').textContent =
+                        `Update All (${remaining})`;
+                } else {
+                    updateAllBtn.style.display = 'none';
+                }
+            }
+        }
+
+        // Reload addon list
+        await loadInstalledAddons();
+    } catch (error) {
+        console.error(`Failed to update ${addonName}:`, error);
+        optionsState.updatingAddons.delete(addonName);
+        await loadInstalledAddons();
     }
 }
 
@@ -902,8 +2018,8 @@ function setButtonFeedback(buttonId, message, type = 'success', duration = 2000)
         textSpan.textContent = message;
 
         // Add visual feedback class
-        button.classList.remove('btn-feedback-success', 'btn-feedback-error');
-        button.classList.add(`btn-feedback-${type}`);
+        // button.classList.remove('btn-feedback-success', 'btn-feedback-error');
+        // button.classList.add(`btn-feedback-${type}`);
 
         // Restore original text after delay
         setTimeout(() => {
@@ -947,9 +2063,24 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Add to global scope for inline onclick handlers
-window.uninstallAddon = async function (addonName) {
-    if (confirm(`Are you sure you want to uninstall ${addonName}?`)) {
-        console.log(`Uninstalling addon: ${addonName}`);
-        await uninstallAddon(addonName);
-    }
+window.closeAddonModal = closeAddonModal;
+window.toggleAddonGroup = toggleAddonGroup;
+window.openInstalledAddonModal = openInstalledAddonModal;
+window.openRepoGroupModal = openRepoGroupModal;
+window.switchRepoGroupTab = switchRepoGroupTab;
+window.uninstallAddonFromModal = uninstallAddonFromModal;
+window.updateAllAddons = updateAllAddons;
+window.updateSingleAddon = updateSingleAddon;
+window.uninstallAddon = uninstallAddon;
+window.switchModalTab = function (tabName) {
+    const tabs = document.querySelectorAll('.modal-tab');
+    const contents = document.querySelectorAll('.modal-tab-content');
+
+    tabs.forEach(tab => {
+        tab.classList.toggle('active', tab.textContent.trim().toLowerCase() === tabName);
+    });
+
+    contents.forEach(content => {
+        content.classList.toggle('active', content.id === `modal-tab-${tabName}`);
+    });
 };
