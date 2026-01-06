@@ -632,34 +632,27 @@ async function handleMainAction() {
             break;
         case 'update':
             // Check if update is already downloaded
-            {
-                const updateDownloaded = Boolean(appState && appState.updateDownloaded);
-                if (updateDownloaded) {
-                    // Update is downloaded, install and restart
-                    await window.electronAPI.installUpdate();
-                } else {
-                    // Download the update first
-                    try {
-                        // Explicitly mark update as not yet downloaded while we (re)start download
-                        if (appState) {
-                            appState.updateDownloaded = false;
-                        }
-                        updateMainActionButton('update', '⏳ Downloading...', false);
-                        await window.electronAPI.downloadUpdate();
-                        // The 'update-status' listener will handle UI updates
-                        // when download completes
-                    } catch (error) {
-                        console.error('Failed to download update:', error);
-                        showError('Failed to download update: ' + error.message);
-                        // Reset update flags on error
-                        if (appState) {
-                            appState.updateAvailable = false;
-                            appState.updateVersion = null;
-                            appState.updateDownloaded = false;
-                        }
-                        // Restore normal button state
-                        checkGameStatus();
-                    }
+            if (appState.updateDownloaded) {
+                // Update is downloaded, install and restart
+                await window.electronAPI.installUpdate();
+            } else {
+                // Download the update first
+                try {
+                    // Explicitly mark update as not yet downloaded while we (re)start download
+                    appState.updateDownloaded = false;
+                    updateMainActionButton('update', '⏳ Downloading...', false);
+                    await window.electronAPI.downloadUpdate();
+                    // The 'update-status' listener will handle UI updates
+                    // when download completes
+                } catch (error) {
+                    console.error('Failed to download update:', error);
+                    showError('Failed to download update: ' + error.message);
+                    // Reset update flags on error
+                    appState.updateAvailable = false;
+                    appState.updateVersion = null;
+                    appState.updateDownloaded = false;
+                    // Restore normal button state
+                    checkGameStatus();
                 }
             }
             break;
