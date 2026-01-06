@@ -206,7 +206,9 @@ const appState = {
     isDownloading: false,
     downloadPaused: false,
     realmAddress: '',
-    wineInfo: null
+    wineInfo: null,
+    updateAvailable: false,
+    updateVersion: null
 };
 
 console.log('App state initialized');
@@ -464,6 +466,12 @@ function closeSettingsModal() {
 
 // Check game installation status
 async function checkGameStatus() {
+    // Don't override button if launcher update is available
+    if (appState.updateAvailable) {
+        console.log('Launcher update available, skipping game status check for button');
+        return;
+    }
+
     if (!appState.installPath) {
         updateGameStatus('warning', 'Please configure installation path in Options.');
         updateMainActionButton('configure', 'Configure Settings', false);
@@ -622,7 +630,25 @@ async function handleMainAction() {
             await launchWow();
             break;
         case 'update':
-            await window.electronAPI.installUpdate();
+            // If update is ready, install it; otherwise download it first
+            if (elements.mainActionButton.textContent.includes('Restart')) {
+                // Update is downloaded, install and restart
+                await window.electronAPI.installUpdate();
+            } else {
+                // Download the update first
+                try {
+                    updateMainActionButton('update', '⏳ Downloading...', false);
+                    await window.electronAPI.downloadUpdate();
+                    // The 'update-status' listener will handle UI updates when download completes
+                } catch (error) {
+                    console.error('Failed to download update:', error);
+                    showError('Failed to download update: ' + error.message);
+                    // Restore button
+                    if (appState.updateVersion) {
+                        showUpdateNotification(appState.updateVersion);
+                    }
+                }
+            }
             break;
         default:
             console.warn('Unknown button state:', buttonState);
@@ -1046,14 +1072,19 @@ function showUpdateChecking() {
 function hideUpdateNotification() {
     // Don't show notification modal - updates handled through main UI
     console.log('Update notification hidden');
-    checkGameStatus(); // Restore normal button state
+    // Only restore normal button state if no update is available
+    if (!appState.updateAvailable) {
+        checkGameStatus();
+    }
 }
 
 function showUpdateNotification(version) {
     // Don't show modal - use main button and status instead
     console.log(`Update available: v${version}`);
+    appState.updateAvailable = true;
+    appState.updateVersion = version;
     updateGameStatus('warning', `🔄 Launcher update available: v${version}`);
-    updateMainActionButton('update', `⬇️ Download Update v${version}`, true);
+    updateMainActionButton('update', `💾 Download Update v${version}`, true);
 }
 
 function updateDownloadProgress(data) {
@@ -1076,9 +1107,13 @@ function showUpdateReady(version) {
     // Hide progress bar
     elements.progressContainer.style.display = 'none';
 
+    // Keep update flags set - we still have an update ready
+    appState.updateAvailable = true;
+    appState.updateVersion = version;
+
     // Update main action button to install update
     updateGameStatus('success', `✅ Update v${version} ready to install!`);
-    updateMainActionButton('update', `🎉 Install Update v${version}`, true);
+    updateMainActionButton('update', `🔄 Restart & Install v${version}`, true);
 }
 
 // Clean up event listeners when the page unloads

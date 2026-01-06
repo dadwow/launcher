@@ -159,16 +159,19 @@
             "sign": null
         },
         "nsis": {
-            "oneClick": false,
+            "oneClick": true,
+            "perMachine": false,
+            "allowElevation": true,
             "installerLanguages": [
                 "en_US"
             ],
             "artifactName": "PlusCraft-Launcher-Installer.${ext}",
-            "allowToChangeInstallationDirectory": true,
             "createDesktopShortcut": true,
             "createStartMenuShortcut": true,
             "shortcutName": "PlusCraft Launcher",
-            "uninstallDisplayName": "PlusCraft Launcher"
+            "uninstallDisplayName": "PlusCraft Launcher",
+            "runAfterFinish": true,
+            "differentialPackage": true
         },
         "linux": {
             "icon": "build/icon.png",
