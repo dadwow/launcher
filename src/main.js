@@ -375,8 +375,8 @@ app.whenReady()
             let shouldClearCache = false;
 
             try {
-                if (fs.existsSync(versionFile)) {
-                    const savedVersion = fs.readFileSync(versionFile, 'utf8').trim();
+                if (await fs.pathExists(versionFile)) {
+                    const savedVersion = (await fs.readFile(versionFile, 'utf8')).trim();
                     if (savedVersion !== currentVersion) {
                         console.log(
                             `Version changed from ${savedVersion} to ${currentVersion} - clearing cache`
@@ -392,10 +392,12 @@ app.whenReady()
                 if (shouldClearCache) {
                     await session.defaultSession.clearCache();
                     console.log('App cache cleared successfully');
+                    // Save current version only after successful cache clear
+                    await fs.writeFile(versionFile, currentVersion, 'utf8');
+                } else {
+                    // No cache clear needed; still ensure version file is up to date
+                    await fs.writeFile(versionFile, currentVersion, 'utf8');
                 }
-
-                // Save current version
-                fs.writeFileSync(versionFile, currentVersion, 'utf8');
             } catch (err) {
                 console.error('Failed to check/clear cache:', err);
                 // Continue anyway - this shouldn't break the app
