@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, dialog, shell, session } = require('electron');
 const path = require('path');
 const fs = require('fs-extra');
 const os = require('os');
@@ -366,8 +366,43 @@ function createMenu() {
 
 // App event handlers
 app.whenReady()
-    .then(() => {
+    .then(async () => {
         try {
+            // Clear app cache on version change to ensure GUI updates properly
+            const userDataPath = app.getPath('userData');
+            const versionFile = path.join(userDataPath, 'app-version.txt');
+            const currentVersion = app.getVersion();
+            let shouldClearCache = false;
+
+            try {
+                if (await fs.pathExists(versionFile)) {
+                    const savedVersion = (await fs.readFile(versionFile, 'utf8')).trim();
+                    if (savedVersion !== currentVersion) {
+                        console.log(
+                            `Version changed from ${savedVersion} to ${currentVersion} - clearing cache`
+                        );
+                        shouldClearCache = true;
+                    }
+                } else {
+                    console.log('First run or version file missing - clearing cache');
+                    shouldClearCache = true;
+                }
+
+                // Clear cache if version changed
+                if (shouldClearCache) {
+                    await session.defaultSession.clearCache();
+                    console.log('App cache cleared successfully');
+                    // Save current version only after successful cache clear
+                    await fs.writeFile(versionFile, currentVersion, 'utf8');
+                } else {
+                    // No cache clear needed; still ensure version file is up to date
+                    await fs.writeFile(versionFile, currentVersion, 'utf8');
+                }
+            } catch (err) {
+                console.error('Failed to check/clear cache:', err);
+                // Continue anyway - this shouldn't break the app
+            }
+
             // Register as handler for wow:// protocol URLs
             if (app.setAsDefaultProtocolClient) {
                 app.setAsDefaultProtocolClient('wow');
