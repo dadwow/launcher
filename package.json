@@ -55,6 +55,7 @@
         "dotenv": "^17.2.3",
         "electron-updater": "^6.1.7",
         "fs-extra": "^11.2.0",
+        "isomorphic-git": "^1.25.10",
         "node-stream-zip": "^1.15.0"
     },
     "build": {

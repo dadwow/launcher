@@ -29,15 +29,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
     loadSettings: () => ipcRenderer.invoke('load-settings'),
 
     // Addon management
-    installAddonFromGitHub: (owner, repo, installPath) =>
-        ipcRenderer.invoke('install-addon-from-github', owner, repo, installPath),
+    installAddonFromGitHub: (owner, repo, installPath, branch) =>
+        ipcRenderer.invoke('install-addon-from-github', owner, repo, installPath, branch),
     getInstalledAddons: installPath => ipcRenderer.invoke('get-installed-addons', installPath),
     uninstallAddon: (addonName, installPath) =>
         ipcRenderer.invoke('uninstall-addon', addonName, installPath),
-    checkAddonUpdates: addons => ipcRenderer.invoke('check-addon-updates', addons),
-    updateAddon: (githubRepo, installPath) =>
-        ipcRenderer.invoke('update-addon', githubRepo, installPath),
     validateAddonRepo: (owner, repo) => ipcRenderer.invoke('validate-addon-repo', owner, repo),
+
+    // GitHub repository information
+    fetchGitHubRepoInfo: (owner, repo) => ipcRenderer.invoke('get-repo-info', owner, repo),
+    fetchGitHubBranches: (owner, repo) => ipcRenderer.invoke('get-repo-branches', owner, repo),
+    fetchGitHubReadme: (owner, repo) => ipcRenderer.invoke('get-repo-readme', owner, repo),
+
+    // Addon updates
+    checkAddonUpdates: installPath => ipcRenderer.invoke('check-addon-updates', installPath),
+    updateAddon: (addonName, installPath) =>
+        ipcRenderer.invoke('update-addon', addonName, installPath),
 
     // Connection testing
     testRealmConnection: realmAddress => ipcRenderer.invoke('test-realm-connection', realmAddress),
@@ -73,6 +80,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onDownloadProgress: callback => ipcRenderer.on('download-progress', callback),
     onDownloadComplete: callback => ipcRenderer.on('download-complete', callback),
     onDownloadError: callback => ipcRenderer.on('download-error', callback),
+
+    // Event listeners for addon install progress
+    onAddonInstallProgress: callback => ipcRenderer.on('addon-install-progress', callback),
+    onAddonInstallComplete: callback => ipcRenderer.on('addon-install-complete', callback),
 
     // Event listener for extraction progress
     onExtractionProgress: callback => ipcRenderer.on('extraction-progress', callback),
