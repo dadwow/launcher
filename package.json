@@ -106,6 +106,14 @@
             "category": "public.app-category.games",
             "icon": "build/icon.png",
             "artifactName": "PlusCraft-Launcher-${arch}.${ext}",
+            "hardenedRuntime": true,
+            "gatekeeperAssess": false,
+            "entitlements": "build/entitlements.mac.plist",
+            "entitlementsInherit": "build/entitlements.mac.plist",
+            "extendInfo": {
+                "NSAppleEventsUsageDescription": "This app needs to launch the game client",
+                "NSDocumentsFolderUsageDescription": "This app needs to access your documents folder to install the game client"
+            },
             "extraResources": [
                 {
                     "from": "resources",
