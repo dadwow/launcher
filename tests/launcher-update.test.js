@@ -262,6 +262,22 @@ describe('Launcher Self-Update Tests', () => {
     describe('Platform-Specific Configuration', () => {
         let originalPlatform;
 
+        // Helper function to simulate the configuration logic from main.js
+        const setupPlatformConfig = () => {
+            const { app } = require('electron');
+            autoUpdater.allowDowngrade = false; // Default setting
+            if (!app.isPackaged) {
+                if (process.platform === 'win32') {
+                    autoUpdater.forceDevUpdateConfig = true;
+                }
+
+                if (process.platform === 'darwin') {
+                    autoUpdater.forceDevUpdateConfig = true;
+                    autoUpdater.allowDowngrade = true;
+                }
+            }
+        };
+
         beforeEach(() => {
             // Save original values
             originalPlatform = process.platform;
@@ -284,15 +300,6 @@ describe('Launcher Self-Update Tests', () => {
             const { app } = require('electron');
             app.isPackaged = false;
 
-            // Simulate the configuration logic from main.js
-            const setupPlatformConfig = () => {
-                if (!app.isPackaged) {
-                    if (process.platform === 'win32') {
-                        autoUpdater.forceDevUpdateConfig = true;
-                    }
-                }
-            };
-
             setupPlatformConfig();
 
             expect(autoUpdater.forceDevUpdateConfig).toBe(true);
@@ -306,17 +313,6 @@ describe('Launcher Self-Update Tests', () => {
 
             const { app } = require('electron');
             app.isPackaged = false;
-
-            // Simulate the configuration logic from main.js
-            const setupPlatformConfig = () => {
-                autoUpdater.allowDowngrade = false; // Default setting
-                if (!app.isPackaged) {
-                    if (process.platform === 'darwin') {
-                        autoUpdater.forceDevUpdateConfig = true;
-                        autoUpdater.allowDowngrade = true;
-                    }
-                }
-            };
 
             setupPlatformConfig();
 
@@ -333,20 +329,9 @@ describe('Launcher Self-Update Tests', () => {
             const { app } = require('electron');
             app.isPackaged = true;
 
-            // Reset the value
+            // Reset the values
             autoUpdater.forceDevUpdateConfig = false;
             autoUpdater.allowDowngrade = false;
-
-            // Simulate the configuration logic from main.js
-            const setupPlatformConfig = () => {
-                autoUpdater.allowDowngrade = false; // Default setting
-                if (!app.isPackaged) {
-                    if (process.platform === 'darwin') {
-                        autoUpdater.forceDevUpdateConfig = true;
-                        autoUpdater.allowDowngrade = true;
-                    }
-                }
-            };
 
             setupPlatformConfig();
 
@@ -365,15 +350,6 @@ describe('Launcher Self-Update Tests', () => {
 
             // Reset the value
             autoUpdater.forceDevUpdateConfig = false;
-
-            // Simulate the configuration logic from main.js
-            const setupPlatformConfig = () => {
-                if (!app.isPackaged) {
-                    if (process.platform === 'win32') {
-                        autoUpdater.forceDevUpdateConfig = true;
-                    }
-                }
-            };
 
             setupPlatformConfig();
 
