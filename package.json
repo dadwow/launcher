@@ -106,13 +106,13 @@
             "category": "public.app-category.games",
             "icon": "build/icon.png",
             "artifactName": "PlusCraft-Launcher-${arch}.${ext}",
-            "hardenedRuntime": true,
+            "hardenedRuntime": false,
             "gatekeeperAssess": false,
             "entitlements": "build/entitlements.mac.plist",
             "entitlementsInherit": "build/entitlements.mac.plist",
             "extendInfo": {
-                "NSAppleEventsUsageDescription": "This app needs to launch the game client",
-                "NSDocumentsFolderUsageDescription": "This app needs to access your documents folder to install the game client"
+                "NSAppleEventsUsageDescription": "PlusCraft Launcher sends Apple Events to the World of Warcraft game client to start the game and apply your selected launch settings.",
+                "NSDocumentsFolderUsageDescription": "PlusCraft Launcher needs access to your Documents folder to locate, install, and update World of Warcraft game files stored there."
             },
             "extraResources": [
                 {

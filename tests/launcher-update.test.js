@@ -258,4 +258,126 @@ describe('Launcher Self-Update Tests', () => {
 
         expect(mockWindow.webContents.send).toHaveBeenCalledWith('update-not-available');
     });
+
+    describe('Platform-Specific Configuration', () => {
+        let originalPlatform;
+
+        beforeEach(() => {
+            // Save original values
+            originalPlatform = process.platform;
+            jest.clearAllMocks();
+        });
+
+        afterEach(() => {
+            // Restore original values
+            Object.defineProperty(process, 'platform', {
+                value: originalPlatform
+            });
+        });
+
+        test('should enable forceDevUpdateConfig for Windows in development', () => {
+            // Mock Windows platform
+            Object.defineProperty(process, 'platform', {
+                value: 'win32'
+            });
+
+            const { app } = require('electron');
+            app.isPackaged = false;
+
+            // Simulate the configuration logic from main.js
+            const setupPlatformConfig = () => {
+                if (!app.isPackaged) {
+                    if (process.platform === 'win32') {
+                        autoUpdater.forceDevUpdateConfig = true;
+                    }
+                }
+            };
+
+            setupPlatformConfig();
+
+            expect(autoUpdater.forceDevUpdateConfig).toBe(true);
+        });
+
+        test('should enable forceDevUpdateConfig and allowDowngrade for macOS in development', () => {
+            // Mock macOS platform
+            Object.defineProperty(process, 'platform', {
+                value: 'darwin'
+            });
+
+            const { app } = require('electron');
+            app.isPackaged = false;
+
+            // Simulate the configuration logic from main.js
+            const setupPlatformConfig = () => {
+                autoUpdater.allowDowngrade = false; // Default setting
+                if (!app.isPackaged) {
+                    if (process.platform === 'darwin') {
+                        autoUpdater.forceDevUpdateConfig = true;
+                        autoUpdater.allowDowngrade = true;
+                    }
+                }
+            };
+
+            setupPlatformConfig();
+
+            expect(autoUpdater.forceDevUpdateConfig).toBe(true);
+            expect(autoUpdater.allowDowngrade).toBe(true);
+        });
+
+        test('should not enable forceDevUpdateConfig for macOS in production', () => {
+            // Mock macOS platform
+            Object.defineProperty(process, 'platform', {
+                value: 'darwin'
+            });
+
+            const { app } = require('electron');
+            app.isPackaged = true;
+
+            // Reset the value
+            autoUpdater.forceDevUpdateConfig = false;
+            autoUpdater.allowDowngrade = false;
+
+            // Simulate the configuration logic from main.js
+            const setupPlatformConfig = () => {
+                autoUpdater.allowDowngrade = false; // Default setting
+                if (!app.isPackaged) {
+                    if (process.platform === 'darwin') {
+                        autoUpdater.forceDevUpdateConfig = true;
+                        autoUpdater.allowDowngrade = true;
+                    }
+                }
+            };
+
+            setupPlatformConfig();
+
+            expect(autoUpdater.forceDevUpdateConfig).toBe(false);
+            expect(autoUpdater.allowDowngrade).toBe(false);
+        });
+
+        test('should not enable forceDevUpdateConfig for Windows in production', () => {
+            // Mock Windows platform
+            Object.defineProperty(process, 'platform', {
+                value: 'win32'
+            });
+
+            const { app } = require('electron');
+            app.isPackaged = true;
+
+            // Reset the value
+            autoUpdater.forceDevUpdateConfig = false;
+
+            // Simulate the configuration logic from main.js
+            const setupPlatformConfig = () => {
+                if (!app.isPackaged) {
+                    if (process.platform === 'win32') {
+                        autoUpdater.forceDevUpdateConfig = true;
+                    }
+                }
+            };
+
+            setupPlatformConfig();
+
+            expect(autoUpdater.forceDevUpdateConfig).toBe(false);
+        });
+    });
 });

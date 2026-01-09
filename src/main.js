@@ -36,17 +36,20 @@ autoUpdater.allowDowngrade = false; // Don't allow downgrades
 autoUpdater.fullChangelog = false; // Don't fetch full changelog
 autoUpdater.allowPrerelease = false; // Don't check for pre-releases
 
-// Disable signature verification for Windows and macOS (for unsigned builds)
-if (process.platform === 'win32') {
-    // Force update to bypass signature check on Windows
-    autoUpdater.forceDevUpdateConfig = true;
-}
+// Disable signature verification for Windows and macOS only in development/unsigned builds
+if (!app.isPackaged) {
+    if (process.platform === 'win32') {
+        // Force update to bypass signature check on Windows (development only)
+        autoUpdater.forceDevUpdateConfig = true;
+    }
 
-if (process.platform === 'darwin') {
-    // Disable signature verification on macOS for unsigned builds
-    // This allows auto-updates to work without code signing certificates
-    autoUpdater.forceDevUpdateConfig = true;
-    process.env.ELECTRON_UPDATER_ALLOW_DOWNGRADE = '1';
+    if (process.platform === 'darwin') {
+        // Disable signature verification on macOS for unsigned builds (development only)
+        // This allows auto-updates to work without code signing certificates
+        autoUpdater.forceDevUpdateConfig = true;
+        // Allow downgrades explicitly for macOS unsigned builds
+        autoUpdater.allowDowngrade = true;
+    }
 }
 
 // Load .env from multiple possible locations
