@@ -1,6 +1,6 @@
 {
     "name": "wow-launcher",
-    "version": "1.2.1",
+    "version": "1.2.2",
     "description": "WoW 3.3.5a Client Launcher built with Electron",
     "main": "src/main.js",
     "scripts": {
@@ -106,6 +106,14 @@
             "category": "public.app-category.games",
             "icon": "build/icon.png",
             "artifactName": "PlusCraft-Launcher-${arch}.${ext}",
+            "hardenedRuntime": false,
+            "gatekeeperAssess": false,
+            "entitlements": "build/entitlements.mac.plist",
+            "entitlementsInherit": "build/entitlements.mac.plist",
+            "extendInfo": {
+                "NSAppleEventsUsageDescription": "PlusCraft Launcher sends Apple Events to the World of Warcraft game client to start the game and apply your selected launch settings.",
+                "NSDocumentsFolderUsageDescription": "PlusCraft Launcher needs access to your Documents folder to locate, install, and update World of Warcraft game files stored there."
+            },
             "extraResources": [
                 {
                     "from": "resources",

@@ -18,5 +18,12 @@
     <true/>
     <key>com.apple.security.files.downloads.read-write</key>
     <true/>
+    <key>com.apple.security.automation.apple-events</key>
+    <true/>
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+    <!-- WARNING: This entitlement disables macOS library validation and should only be used
+         for development or unsigned builds. Remove this key (or set it to false) for
+         production builds once proper code signing and hardened runtime are in place. -->
 </dict>
 </plist>
