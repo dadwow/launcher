@@ -10,7 +10,9 @@ jest.mock('electron-updater', () => ({
         on: jest.fn(),
         autoDownload: false,
         autoInstallOnAppQuit: true,
-        logger: null
+        logger: null,
+        forceDevUpdateConfig: false,
+        allowDowngrade: false
     }
 }));
 
@@ -25,7 +27,8 @@ jest.mock('electron', () => ({
     app: {
         getVersion: jest.fn(() => '1.0.0'),
         isReady: jest.fn(() => true),
-        on: jest.fn()
+        on: jest.fn(),
+        isPackaged: false
     },
     BrowserWindow: jest.fn(() => mockWindow)
 }));
@@ -33,6 +36,9 @@ jest.mock('electron', () => ({
 describe('Launcher Self-Update Tests', () => {
     beforeEach(() => {
         jest.clearAllMocks();
+        // Reset autoUpdater properties to default values
+        autoUpdater.forceDevUpdateConfig = false;
+        autoUpdater.allowDowngrade = false;
     });
 
     test('should check for updates on startup', async () => {
@@ -282,19 +288,26 @@ describe('Launcher Self-Update Tests', () => {
             // Save original values
             originalPlatform = process.platform;
             jest.clearAllMocks();
+            // Reset autoUpdater properties
+            autoUpdater.forceDevUpdateConfig = false;
+            autoUpdater.allowDowngrade = false;
         });
 
         afterEach(() => {
             // Restore original values
             Object.defineProperty(process, 'platform', {
-                value: originalPlatform
+                value: originalPlatform,
+                writable: true,
+                configurable: true
             });
         });
 
         test('should enable forceDevUpdateConfig for Windows in development', () => {
             // Mock Windows platform
             Object.defineProperty(process, 'platform', {
-                value: 'win32'
+                value: 'win32',
+                writable: true,
+                configurable: true
             });
 
             const { app } = require('electron');
@@ -308,7 +321,9 @@ describe('Launcher Self-Update Tests', () => {
         test('should enable forceDevUpdateConfig and allowDowngrade for macOS in development', () => {
             // Mock macOS platform
             Object.defineProperty(process, 'platform', {
-                value: 'darwin'
+                value: 'darwin',
+                writable: true,
+                configurable: true
             });
 
             const { app } = require('electron');
@@ -323,7 +338,9 @@ describe('Launcher Self-Update Tests', () => {
         test('should not enable forceDevUpdateConfig for macOS in production', () => {
             // Mock macOS platform
             Object.defineProperty(process, 'platform', {
-                value: 'darwin'
+                value: 'darwin',
+                writable: true,
+                configurable: true
             });
 
             const { app } = require('electron');
@@ -342,7 +359,9 @@ describe('Launcher Self-Update Tests', () => {
         test('should not enable forceDevUpdateConfig for Windows in production', () => {
             // Mock Windows platform
             Object.defineProperty(process, 'platform', {
-                value: 'win32'
+                value: 'win32',
+                writable: true,
+                configurable: true
             });
 
             const { app } = require('electron');
