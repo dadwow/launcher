@@ -111,7 +111,7 @@ jobs:
           echo "Pre-release version: $PRE_VERSION"
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           path: staging-artifacts
 
